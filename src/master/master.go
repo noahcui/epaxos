@@ -72,7 +72,7 @@ func (master *Master) run() {
 		addr := fmt.Sprintf("%s:%d", master.addrList[i], master.portList[i]+1000)
 		master.nodes[i], err = rpc.DialHTTP("tcp", addr)
 		if err != nil {
-			log.Fatalf("Error connecting to replica %d\n", i)
+			log.Fatalf("Error connecting to replica %d at %v, errmsg: %v\n", i, addr, err)
 		}
 		master.leader[i] = false
 	}

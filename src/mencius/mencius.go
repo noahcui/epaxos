@@ -181,6 +181,7 @@ func (r *Replica) run() {
 	go r.WaitForClientConnections()
 
 	if r.Exec {
+		log.Printf("executing!\n")
 		go r.executeCommands()
 	}
 
@@ -881,7 +882,7 @@ func (r *Replica) forceCommit() {
 
 	//try to take over the problem instance
 	if int(problemInstance)%r.N == int(r.Id+1)%r.N {
-		log.Println("Replica", r.Id, "Trying to take over instance", problemInstance)
+		log.Println("Replica", r.Id, "r.N=", r.N, "Trying to take over instance", problemInstance)
 		if r.instanceSpace[problemInstance] == nil {
 			r.instanceSpace[problemInstance] = &Instance{true,
 				NB_INST_TO_SKIP,
@@ -892,6 +893,7 @@ func (r *Replica) forceCommit() {
 			r.bcastPrepare(problemInstance, r.instanceSpace[problemInstance].ballot)
 		} else {
 			log.Println("Not nil")
+			r.bcastPrepare(problemInstance, r.instanceSpace[problemInstance].ballot)
 		}
 	}
 }

@@ -70,8 +70,23 @@ func main() {
 	put := make([]bool, *reqsNb / *rounds + *eps)
 	perReplicaCount := make([]int, N)
 	test := make([]int, *reqsNb / *rounds + *eps)
+	for i := 0; i < N; i++ {
+		var err error
+		servers[i], err = net.Dial("tcp", rlReply.ReplicaList[i])
+		readers[i] = bufio.NewReader(servers[i])
+		writers[i] = bufio.NewWriter(servers[i])
+		if err != nil {
+			log.Printf("Error connecting to replica %d\n", i)
+			readers[i] = nil
+			writers[i] = nil
+		}
+	}
+
 	for i := 0; i < len(rarray); i++ {
 		r := rand.Intn(N)
+		for writers[r] == nil {
+			r = rand.Intn(N)
+		}
 		rarray[i] = r
 		if i < *reqsNb / *rounds {
 			perReplicaCount[r]++
@@ -100,16 +115,6 @@ func main() {
 	} else {
 		fmt.Println("Zipfian distribution:")
 		//fmt.Println(test[0:100])
-	}
-
-	for i := 0; i < N; i++ {
-		var err error
-		servers[i], err = net.Dial("tcp", rlReply.ReplicaList[i])
-		if err != nil {
-			log.Printf("Error connecting to replica %d\n", i)
-		}
-		readers[i] = bufio.NewReader(servers[i])
-		writers[i] = bufio.NewWriter(servers[i])
 	}
 
 	successful = make([]int, N)
@@ -166,26 +171,35 @@ func main() {
 				if *noLeader {
 					leader = rarray[i]
 				}
-				writers[leader].WriteByte(genericsmrproto.PROPOSE)
-				args.Marshal(writers[leader])
+				if writers[leader] != nil {
+					writers[leader].WriteByte(genericsmrproto.PROPOSE)
+					args.Marshal(writers[leader])
+				}
+
 			} else {
 				//send to everyone
 				for rep := 0; rep < N; rep++ {
-					writers[rep].WriteByte(genericsmrproto.PROPOSE)
-					args.Marshal(writers[rep])
-					writers[rep].Flush()
+					if writers[leader] != nil {
+						writers[rep].WriteByte(genericsmrproto.PROPOSE)
+						args.Marshal(writers[rep])
+						writers[rep].Flush()
+					}
 				}
 			}
 			//fmt.Println("Sent", id)
 			id++
 			if i%100 == 0 {
 				for i := 0; i < N; i++ {
-					writers[i].Flush()
+					if writers[i] != nil {
+						writers[i].Flush()
+					}
 				}
 			}
 		}
 		for i := 0; i < N; i++ {
-			writers[i].Flush()
+			if writers[i] != nil {
+				writers[i].Flush()
+			}
 		}
 
 		err := false
@@ -245,8 +259,12 @@ func waitReplies(readers []*bufio.Reader, leader int, n int, done chan bool) {
 
 	reply := new(genericsmrproto.ProposeReplyTS)
 	for i := 0; i < n; i++ {
+		if readers[leader] == nil {
+			e = true
+			continue
+		}
 		if err := reply.Unmarshal(readers[leader]); err != nil {
-			fmt.Println("Error when reading:", err)
+			fmt.Println(leader, "Error when reading:", err)
 			e = true
 			continue
 		}
