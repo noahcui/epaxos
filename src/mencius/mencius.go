@@ -15,7 +15,7 @@ import (
 
 const CHAN_BUFFER_SIZE = 200000
 const WAIT_BEFORE_SKIP_MS = 50
-const NB_INST_TO_SKIP = 100000
+const NB_INST_TO_SKIP = 100
 const MAX_SKIPS_WAITING = 20
 const TRUE = uint8(1)
 const FALSE = uint8(0)
