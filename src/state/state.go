@@ -16,6 +16,7 @@ const (
 	DELETE
 	RLOCK
 	WLOCK
+	PUT_BLIND // Result not needed immediately
 )
 
 type Value int64

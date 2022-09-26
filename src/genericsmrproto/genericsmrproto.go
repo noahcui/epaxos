@@ -24,6 +24,7 @@ type Propose struct {
 type ProposeReply struct {
 	OK        uint8
 	CommandId int32
+	Timestamp int64
 }
 
 type ProposeReplyTS struct {
