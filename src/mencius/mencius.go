@@ -4,6 +4,7 @@ import (
 	"dlog"
 	"encoding/binary"
 	"fastrpc"
+	"fmt"
 	"genericsmr"
 	"genericsmrproto"
 	"io"
@@ -14,8 +15,8 @@ import (
 )
 
 const CHAN_BUFFER_SIZE = 200000
-const WAIT_BEFORE_SKIP_MS = 5
-const NB_INST_TO_SKIP = 10
+const WAIT_BEFORE_SKIP_MS = 50
+const NB_INST_TO_SKIP = 100
 const MAX_SKIPS_WAITING = 20
 const TRUE = uint8(1)
 const FALSE = uint8(0)
@@ -117,7 +118,7 @@ func NewReplica(id int, peerAddrList []string, thrifty bool, exec bool, dreply b
 	r.acceptReplyRPC = r.RegisterRPC(new(menciusproto.AcceptReply), r.acceptReplyChan)
 
 	go r.run()
-
+	fmt.Println("makesure changes applied, hello")
 	return r
 }
 
@@ -261,7 +262,7 @@ func (r *Replica) run() {
 
 func (r *Replica) clock() {
 	for !r.Shutdown {
-		time.Sleep(1000 * 1000)
+		time.Sleep(100 * 1000 * 1000)
 		r.clockChan <- true
 	}
 }
