@@ -4,6 +4,7 @@ import (
 	"dlog"
 	"encoding/binary"
 	"fastrpc"
+	"fmt"
 	"genericsmr"
 	"genericsmrproto"
 	"io"
@@ -182,7 +183,7 @@ func (r *Replica) run() {
 
 	if r.Exec {
 		log.Printf("executing!\n")
-		log.Println("makesure changes applied, hello")
+		fmt.Println("makesure changes applied, hello")
 		go r.executeCommands()
 	}
 
