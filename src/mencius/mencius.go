@@ -4,7 +4,6 @@ import (
 	"dlog"
 	"encoding/binary"
 	"fastrpc"
-	"fmt"
 	"genericsmr"
 	"genericsmrproto"
 	"io"
@@ -118,7 +117,7 @@ func NewReplica(id int, peerAddrList []string, thrifty bool, exec bool, dreply b
 	r.acceptReplyRPC = r.RegisterRPC(new(menciusproto.AcceptReply), r.acceptReplyChan)
 
 	go r.run()
-	fmt.Println("makesure changes applied, hello")
+
 	return r
 }
 
@@ -183,6 +182,7 @@ func (r *Replica) run() {
 
 	if r.Exec {
 		log.Printf("executing!\n")
+		log.Println("makesure changes applied, hello")
 		go r.executeCommands()
 	}
 
