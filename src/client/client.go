@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"dlog"
 	"flag"
 	"fmt"
 	"genericsmrproto"
@@ -13,8 +12,11 @@ import (
 	"net/rpc"
 	"runtime"
 	"state"
+	"sync"
 	"time"
 )
+
+var outstandingReqs = flag.Int64("or", 1, "Number of outstanding requests a thread can have at any given time.")
 
 var masterAddr *string = flag.String("maddr", "", "Master address. Defaults to localhost")
 var masterPort *int = flag.Int("mport", 7087, "Master port.  Defaults to 7077.")
@@ -22,29 +24,100 @@ var reqsNb *int = flag.Int("q", 5000, "Total number of requests. Defaults to 500
 var writes *int = flag.Int("w", 100, "Percentage of updates (writes). Defaults to 100%.")
 var noLeader *bool = flag.Bool("e", false, "Egalitarian (no leader). Defaults to false.")
 var fast *bool = flag.Bool("f", false, "Fast Paxos: send message directly to all replicas. Defaults to false.")
-var rounds *int = flag.Int("r", 1, "Split the total number of requests into this many rounds, and do rounds sequentially. Defaults to 1.")
-var procs *int = flag.Int("p", 2, "GOMAXPROCS. Defaults to 2")
+var rounds *int = flag.Int("r", 10, "Split the total number of requests into this many rounds, and do rounds sequentially. Defaults to 1.")
+var procs *int = flag.Int("p", -1, "GOMAXPROCS. Defaults to unlimit")
 var check = flag.Bool("check", false, "Check that every expected reply was received exactly once.")
 var eps *int = flag.Int("eps", 0, "Send eps more messages per round than the client will wait for (to discount stragglers). Defaults to 0.")
 var conflicts *int = flag.Int("c", -1, "Percentage of conflicts. Defaults to 0%")
+var t *int = flag.Int("t", 5, "time in seconds for each round")
+var T = flag.Int("T", 10, "Number of threads (simulated clients).")
 var s = flag.Float64("s", 2, "Zipfian s parameter")
 var v = flag.Float64("v", 1, "Zipfian v parameter")
+var thinktime *int = flag.Int("think", 100, "time in nanoseconds for thinking")
+var zKeys = flag.Uint64("z", 1e9, "Number of unique keys in zipfian distribution.")
+var theta = flag.Float64("theta", 0.99, "Theta zipfian parameter")
+
+type outInfo struct {
+	// sync.Mutex
+	// sema       *semaphore.Weighted // Controls number of outstanding operations
+	startTimes time.Time // The time at which operations were sent out
+	endTimes   time.Time
+	done       bool
+}
+
+var mu sync.Mutex
 
 var N int
 
 var successful []int
-
+var ct []uint64
 var rarray []int
 var rsp []bool
+var outInfos []*outInfo
+var start []map[int32]time.Time
+var end []map[int32]time.Time
 
+func clientWriter(idx int, writer *bufio.Writer, stop chan int, next chan int, wg *sync.WaitGroup) {
+	// defer wg.Done()
+	args := genericsmrproto.Propose{0 /* id */, state.Command{state.PUT, 0, 0}, 0 /* timestamp */}
+	for id := int32(0); ; id++ {
+		select {
+		case <-stop:
+			fmt.Println("stopping sender ", idx)
+			return
+		default:
+			args.CommandId = id
+			r := int(id) % 10000
+			if r < *conflicts {
+				args.Command.K = 42
+			} else {
+				args.Command.K = state.Key(r)
+			}
+			// Determine operation type
+			if *writes > rand.Intn(100) {
+				args.Command.Op = state.PUT // write operation
+			} else {
+				args.Command.Op = state.GET // read operation
+			}
+			writer.WriteByte(genericsmrproto.PROPOSE)
+			args.Marshal(writer)
+			writer.Flush()
+			// out := outInfo{startTimes: time.Now()}
+			start[idx][id] = time.Now()
+			time.Sleep(time.Nanosecond * time.Duration(*thinktime))
+		}
+	}
+}
+
+func clientReader(idx int, reader *bufio.Reader, stop chan int, next chan int, wg *sync.WaitGroup) {
+	defer wg.Done()
+	var reply genericsmrproto.ProposeReply
+	ticker := time.NewTicker(time.Second * time.Duration(*t))
+	for {
+		select {
+		case <-ticker.C:
+			stop <- 1
+			return
+		default:
+			if err := reply.Unmarshal(reader); err != nil {
+				log.Println("Error when reading:", err)
+				stop <- 1
+				return
+			}
+			if reply.OK != 0 {
+				ct[idx]++
+				end[idx][reply.CommandId] = time.Now()
+			}
+		}
+	}
+	stop <- 1
+}
+
+// func makeConnections()
 func main() {
 	flag.Parse()
 
 	runtime.GOMAXPROCS(*procs)
-
-	randObj := rand.New(rand.NewSource(42))
-	zipf := rand.NewZipf(randObj, *s, *v, uint64(*reqsNb / *rounds + *eps))
-
 	if *conflicts > 100 {
 		log.Fatalf("Conflicts percentage must be between 0 and 100.\n")
 	}
@@ -59,227 +132,47 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error making the GetReplicaList RPC")
 	}
-
+	var wg sync.WaitGroup
 	N = len(rlReply.ReplicaList)
-	servers := make([]net.Conn, N)
-	readers := make([]*bufio.Reader, N)
-	writers := make([]*bufio.Writer, N)
-
-	rarray = make([]int, *reqsNb / *rounds + *eps)
-	karray := make([]int64, *reqsNb / *rounds + *eps)
-	put := make([]bool, *reqsNb / *rounds + *eps)
-	perReplicaCount := make([]int, N)
-	test := make([]int, *reqsNb / *rounds + *eps)
-	for i := 0; i < N; i++ {
-		var err error
-		servers[i], err = net.Dial("tcp", rlReply.ReplicaList[i])
-		readers[i] = bufio.NewReader(servers[i])
-		writers[i] = bufio.NewWriter(servers[i])
+	readers := make([]*bufio.Reader, *T)
+	writers := make([]*bufio.Writer, *T)
+	start = make([]map[int32]time.Time, *T)
+	end = make([]map[int32]time.Time, *T)
+	for i := 0; i < *T; i++ {
+		server, err := net.Dial("tcp", rlReply.ReplicaList[i%N])
 		if err != nil {
-			log.Printf("Error connecting to replica %d\n", i)
-			readers[i] = nil
-			writers[i] = nil
-		}
-	}
-
-	for i := 0; i < len(rarray); i++ {
-		r := rand.Intn(N)
-		for writers[r] == nil {
-			r = rand.Intn(N)
-		}
-		rarray[i] = r
-		if i < *reqsNb / *rounds {
-			perReplicaCount[r]++
-		}
-
-		if *conflicts >= 0 {
-			r = rand.Intn(100)
-			if r < *conflicts {
-				karray[i] = 42
-			} else {
-				karray[i] = int64(43 + i)
-			}
-			r = rand.Intn(100)
-			if r < *writes {
-				put[i] = true
-			} else {
-				put[i] = false
-			}
-		} else {
-			karray[i] = int64(zipf.Uint64())
-			test[karray[i]]++
-		}
-	}
-	if *conflicts >= 0 {
-		fmt.Println("Uniform distribution")
-	} else {
-		fmt.Println("Zipfian distribution:")
-		//fmt.Println(test[0:100])
-	}
-
-	successful = make([]int, N)
-	leader := 0
-
-	if *noLeader == false {
-		reply := new(masterproto.GetLeaderReply)
-		if err = master.Call("Master.GetLeader", new(masterproto.GetLeaderArgs), reply); err != nil {
-			log.Fatalf("Error making the GetLeader RPC\n")
-		}
-		leader = reply.LeaderId
-		log.Printf("The leader is replica %d\n", leader)
-	}
-
-	var id int32 = 0
-	done := make(chan bool, N)
-	args := genericsmrproto.Propose{id, state.Command{state.PUT, 0, 0}, 0}
-
-	before_total := time.Now()
-
-	for j := 0; j < *rounds; j++ {
-
-		n := *reqsNb / *rounds
-
-		if *check {
-			rsp = make([]bool, n)
-			for j := 0; j < n; j++ {
-				rsp[j] = false
-			}
-		}
-
-		if *noLeader {
-			for i := 0; i < N; i++ {
-				go waitReplies(writers, readers, i, perReplicaCount[i], done)
-			}
-		} else {
-			go waitReplies(writers, readers, leader, n, done)
-		}
-
-		before := time.Now()
-
-		for i := 0; i < n+*eps; i++ {
-			dlog.Printf("Sending proposal %d\n", id)
-			args.CommandId = id
-			if put[i] {
-				args.Command.Op = state.PUT
-			} else {
-				args.Command.Op = state.GET
-			}
-			args.Command.K = state.Key(karray[i])
-			args.Command.V = state.Value(i)
-			//args.Timestamp = time.Now().UnixNano()
-			if !*fast {
-				if *noLeader {
-					leader = rarray[i]
-				}
-				if writers[leader] != nil {
-					writers[leader].WriteByte(genericsmrproto.PROPOSE)
-					args.Marshal(writers[leader])
-				}
-
-			} else {
-				//send to everyone
-				for rep := 0; rep < N; rep++ {
-					if writers[leader] != nil {
-						writers[rep].WriteByte(genericsmrproto.PROPOSE)
-						args.Marshal(writers[rep])
-						writers[rep].Flush()
-					}
-				}
-			}
-			//fmt.Println("Sent", id)
-			id++
-			if i%100 == 0 {
-				for i := 0; i < N; i++ {
-					if writers[i] != nil {
-						writers[i].Flush()
-					}
-				}
-			}
-		}
-		for i := 0; i < N; i++ {
-			if writers[i] != nil {
-				writers[i].Flush()
-			}
-		}
-
-		err := false
-		if *noLeader {
-			for i := 0; i < N; i++ {
-				e := <-done
-				err = e || err
-			}
-		} else {
-			err = <-done
-		}
-
-		after := time.Now()
-
-		fmt.Printf("Round took %v\n", after.Sub(before))
-
-		if *check {
-			for j := 0; j < n; j++ {
-				if !rsp[j] {
-					fmt.Println("Didn't receive", j)
-				}
-			}
-		}
-
-		if err {
-			if *noLeader {
-				N = N - 1
-			} else {
-				reply := new(masterproto.GetLeaderReply)
-				master.Call("Master.GetLeader", new(masterproto.GetLeaderArgs), reply)
-				leader = reply.LeaderId
-				log.Printf("New leader is replica %d\n", leader)
-			}
-		}
-	}
-
-	after_total := time.Now()
-	fmt.Printf("Test took %v\n", after_total.Sub(before_total))
-
-	s := 0
-	for _, succ := range successful {
-		s += succ
-	}
-
-	fmt.Printf("Successful: %d\n", s)
-
-	for _, client := range servers {
-		if client != nil {
-			client.Close()
-		}
-	}
-	master.Close()
-}
-
-func waitReplies(writers []*bufio.Writer, readers []*bufio.Reader, leader int, n int, done chan bool) {
-	e := false
-
-	reply := new(genericsmrproto.ProposeReplyTS)
-	for i := 0; i < n; i++ {
-		if readers[leader] == nil {
-			e = true
+			log.Println("error connecting to server ", i%N)
 			continue
 		}
-		if err := reply.Unmarshal(readers[leader]); err != nil {
-			fmt.Println(leader, "Error when reading:", err)
-			readers[leader] = nil
-			writers[leader] = nil
-			e = true
-			continue
-		}
-		//fmt.Println(reply.Value)
-		if *check {
-			if rsp[reply.CommandId] {
-				fmt.Println("Duplicate reply", reply.CommandId)
-			}
-			rsp[reply.CommandId] = true
-		}
-		if reply.OK != 0 {
-			successful[leader]++
+		reader := bufio.NewReader(server)
+		writer := bufio.NewWriter(server)
+		readers[i] = reader
+		writers[i] = writer
+	}
+	ct = make([]uint64, *T)
+	fmt.Println("start testing! waiting for results")
+	for i := 0; i < *T; i++ {
+		ct[i] = 0
+		done := make(chan int)
+		next := make(chan int)
+		go clientReader(i, readers[i], done, next, &wg)
+		go clientWriter(i, writers[i], done, next, &wg)
+		wg.Add(1)
+	}
+
+	wg.Wait()
+	var total uint64
+	for _, item := range ct {
+		total += item
+	}
+	// latencies:= make(heap)
+	var ls []time.Duration
+	for idx, endtimes := range end {
+		for cid, etime := range endtimes {
+			stime := start[idx][cid]
+			l := etime.Sub(stime)
+			ls = append(ls, l)
 		}
 	}
-	done <- e
+	fmt.Println(total/uint64(*t), total, ct)
 }

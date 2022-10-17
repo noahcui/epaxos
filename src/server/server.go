@@ -8,6 +8,7 @@ import (
 	"log"
 	"masterproto"
 	"mencius"
+	"menciusopt"
 	"net"
 	"net/http"
 	"net/rpc"
@@ -24,6 +25,7 @@ var masterAddr *string = flag.String("maddr", "", "Master address. Defaults to l
 var masterPort *int = flag.Int("mport", 7087, "Master port.  Defaults to 7087.")
 var myAddr *string = flag.String("addr", "", "Server address (this machine). Defaults to localhost.")
 var doMencius *bool = flag.Bool("m", false, "Use Mencius as the replication protocol. Defaults to false.")
+var doMenciusOpt *bool = flag.Bool("mo", false, "Use MenciusOpt as the replication protocol. Defaults to false.")
 var doGpaxos *bool = flag.Bool("g", false, "Use Generalized Paxos as the replication protocol. Defaults to false.")
 var doEpaxos *bool = flag.Bool("e", false, "Use EPaxos as the replication protocol. Defaults to false.")
 var procs *int = flag.Int("p", 2, "GOMAXPROCS. Defaults to 2")
@@ -62,6 +64,10 @@ func main() {
 	} else if *doMencius {
 		log.Println("Starting Mencius replica...")
 		rep := mencius.NewReplica(replicaId, nodeList, *thrifty, *exec, *dreply, *durable)
+		rpc.Register(rep)
+	} else if *doMenciusOpt {
+		log.Println("Starting Mencius replica...")
+		rep := menciusopt.NewReplica(replicaId, nodeList, *thrifty, *exec, *dreply, *durable)
 		rpc.Register(rep)
 	} else if *doGpaxos {
 		log.Println("Starting Generalized Paxos replica...")
