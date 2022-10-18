@@ -106,7 +106,10 @@ func clientReader(idx int, reader *bufio.Reader, stop chan int, next chan int, w
 			}
 			if reply.OK != 0 {
 				ct[idx]++
-				end[idx][reply.CommandId] = time.Now()
+				if _, notempty := end[idx][reply.CommandId]; !notempty {
+					end[idx][reply.CommandId] = time.Now()
+				}
+
 			}
 		}
 	}
@@ -153,18 +156,19 @@ func main() {
 	fmt.Println("start testing! waiting for results")
 	for i := 0; i < *T; i++ {
 		ct[i] = 0
+		start[i] = make(map[int32]time.Time)
+		end[i] = make(map[int32]time.Time)
 		done := make(chan int)
 		next := make(chan int)
+		wg.Add(1)
 		go clientReader(i, readers[i], done, next, &wg)
 		go clientWriter(i, writers[i], done, next, &wg)
-		wg.Add(1)
 	}
 
 	wg.Wait()
 	var total uint64
-	for _, item := range ct {
-		total += item
-	}
+	total = 0
+	var sum time.Duration
 	// latencies:= make(heap)
 	var ls []time.Duration
 	for idx, endtimes := range end {
@@ -172,7 +176,14 @@ func main() {
 			stime := start[idx][cid]
 			l := etime.Sub(stime)
 			ls = append(ls, l)
+			sum += l
+			total += 1
 		}
 	}
-	fmt.Println(total/uint64(*t), total, ct)
-}
+	fmt.Println(total/uint64(*t), total, sum/time.Duration(total), ct)
+	master.Close()
+// 	for i := 0; i < *T; i++ {
+// 		readers[i].Reset(nil)
+// 		writers[i].Reset(nil)
+// 	}
+// }

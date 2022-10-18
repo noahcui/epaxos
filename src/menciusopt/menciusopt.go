@@ -70,7 +70,7 @@ type Instance struct {
 	command       []*state.Command
 	ballot        int32
 	status        InstanceStatus
-	lb            *LeaderBookkeeping
+	lb            []*LeaderBookkeeping
 }
 
 type LeaderBookkeeping struct {
@@ -198,6 +198,12 @@ func (r *Replica) run() {
 			r.bcastAccept(r.crtInstance, r.instanceSpace[r.crtInstance].ballot, FALSE, 0, state.Command)
 			r.sync()
 			r.crtInstance += r.N
+			r.instanceSpace[r.crtInstance] = &Instance{false,
+				0,
+				make([]*state.Command, 0),
+				r.makeBallotLargerThan(0),
+				ACCEPTED,
+				make([]*LeaderBookkeeping, 0)}
 
 		case propose := <-r.ProposeChan:
 			//got a Propose from a client
@@ -439,6 +445,7 @@ func (r *Replica) handlePropose(propose *genericsmr.Propose) {
 
 	instNo := r.crtInstance
 	r.instanceSpace[instNo].command = append(r.instanceSpace[instNo].command, &propose.Command)
+	r.instanceSpace[instNo].lb = append(r.instanceSpace[instNo].lb, &LeaderBookkeeping{propose, 0, 0, 0, 0})
 	r.recordCommand(&propose.Command)
 	r.sync()
 	dlog.Printf("Choosing req. %d in instance %d\n", propose.CommandId, instNo)
@@ -795,32 +802,32 @@ func (r *Replica) updateBlocking(instance int32) {
 }
 
 func (r *Replica) executeCommands() {
-	execedUpTo := int32(-1)
-	skippedTo := make([]int32, r.N)
-	skippedToOrig := make([]int32, r.N)
-	conflicts := make(map[state.Key]int32, 60000)
+	// execedUpTo := int32(-1)
+	// skippedTo := make([]int32, r.N)
+	// skippedToOrig := make([]int32, r.N)
+	// conflicts := make(map[state.Key]int32, 60000)
 
-	for q := 0; q < r.N; q++ {
-		skippedToOrig[q] = -1
-	}
+	// for q := 0; q < r.N; q++ {
+	// 	skippedToOrig[q] = -1
+	// }
 
-	for !r.Shutdown {
-		executed := false
-		execedUpTo += 1
-		for i := execedUpTo; i < r.crtInstance; i++ {
-			if r.instanceSpace[execedUpTo] == nil {
-				executed = false
-				break
-			}
-			if r.instanceSpace[execedUpTo].status == COMMITTED {
+	// for !r.Shutdown {
+	// 	executed := false
+	// 	execedUpTo += 1
+	// 	for i := execedUpTo; i < r.crtInstance; i++ {
+	// 		if r.instanceSpace[execedUpTo] == nil {
+	// 			executed = false
+	// 			break
+	// 		}
+	// 		if r.instanceSpace[execedUpTo].status == COMMITTED {
 
-			}
-			executed = true
-		}
-		if !executed {
-			time.Sleep(time.Millisecond * 10)
-		}
-	}
+	// 		}
+	// 		executed = true
+	// 	}
+	// 	if !executed {
+	// 		time.Sleep(time.Millisecond * 10)
+	// 	}
+	// }
 }
 
 func (r *Replica) forceCommit() {
