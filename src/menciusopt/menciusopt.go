@@ -48,6 +48,7 @@ type Replica struct {
 	skipsWaiting             int
 	counter                  int
 	skippedTo                []int32
+	maxcommit                int32
 }
 
 type DelayedSkip struct {
@@ -81,6 +82,13 @@ type LeaderBookkeeping struct {
 	nacks          int
 }
 
+func (r *Replica) updatelatestInstCommitted(slot int32) {
+	if r.latestInstCommitted >= slot {
+		return
+	}
+	r.latestInstCommitted = slot
+}
+
 func NewReplica(id int, peerAddrList []string, thrifty bool, exec bool, dreply bool, durable bool) *Replica {
 	skippedTo := make([]int32, len(peerAddrList))
 	for i := 0; i < len(skippedTo); i++ {
@@ -106,7 +114,8 @@ func NewReplica(id int, peerAddrList []string, thrifty bool, exec bool, dreply b
 		false,
 		0,
 		0,
-		skippedTo}
+		skippedTo,
+		0}
 
 	r.Durable = durable
 
@@ -183,12 +192,11 @@ func (r *Replica) run() {
 
 	if r.Exec {
 		log.Printf("executing!\n")
-		fmt.Println("makesure changes applied, hello")
+		// fmt.Println("makesure changes applied, hello")
 		go r.executeCommands()
 	}
 	bTicker := time.NewTicker(time.Millisecond * 1000)
 	go r.clock()
-
 	for !r.Shutdown {
 
 		select {
@@ -201,6 +209,7 @@ func (r *Replica) run() {
 					ACCEPTED,
 					&LeaderBookkeeping{nil, 0, 0, 0, 0}}
 			}
+			fmt.Println(r.crtInstance, r.latestInstReady)
 			// TODO: broadcast the msg and reset the batch log#
 			r.recordInstanceMetadata(r.instanceSpace[r.crtInstance])
 			r.bcastAccept(r.crtInstance, r.instanceSpace[r.crtInstance].ballot, FALSE, 0, r.instanceSpace[r.crtInstance].commands)
@@ -291,34 +300,6 @@ func (r *Replica) makeBallotLargerThan(ballot int32) int32 {
 }
 
 var sk menciusoptproto.Skip
-
-func (r *Replica) bcastSkip(startInstance int32, endInstance int32, exceptReplica int32) {
-	defer func() {
-		if err := recover(); err != nil {
-			dlog.Println("Skip bcast failed:", err)
-		}
-	}()
-	sk.LeaderId = r.Id
-	sk.StartInstance = startInstance
-	sk.EndInstance = endInstance
-	args := &sk
-	//args := &menciusoptproto.Skip{r.Id, startInstance, endInstance}
-
-	n := r.N - 1
-	q := r.Id
-
-	for sent := 0; sent < n; {
-		q = (q + 1) % int32(r.N)
-		if q == r.Id {
-			break
-		}
-		if !r.Alive[q] || q == exceptReplica {
-			continue
-		}
-		sent++
-		r.SendMsgNoFlush(q, r.skipRPC, args)
-	}
-}
 
 func (r *Replica) bcastPrepare(instance int32, ballot int32) {
 	defer func() {
@@ -413,7 +394,7 @@ func (r *Replica) bcastAccept(instance int32, ballot int32, skip uint8, nbInstTo
 
 var mc menciusoptproto.Commit
 
-func (r *Replica) bcastCommit(instance int32, skip uint8, nbInstToSkip int32, command []state.Command) {
+func (r *Replica) bcastCommit(instance int32, skip uint8, nbInstToSkip int32, commands []state.Command) {
 	defer func() {
 		if err := recover(); err != nil {
 			dlog.Println("Commit bcast failed:", err)
@@ -423,7 +404,7 @@ func (r *Replica) bcastCommit(instance int32, skip uint8, nbInstToSkip int32, co
 	mc.Instance = instance
 	mc.Skip = skip
 	mc.NbInstancesToSkip = nbInstToSkip
-	//mc.Command = command
+	mc.Commands = commands
 	//args := &menciusoptproto.Commit{r.Id, instance, skip, nbInstToSkip, command}
 	args := &mc
 
@@ -444,8 +425,16 @@ func (r *Replica) bcastCommit(instance int32, skip uint8, nbInstToSkip int32, co
 }
 
 func (r *Replica) handlePropose(propose *genericsmr.Propose) {
-
 	instNo := r.crtInstance
+	if r.instanceSpace[instNo] == nil {
+		r.instanceSpace[instNo] = &Instance{false,
+			0,
+			make([]state.Command, 1),
+			r.makeBallotLargerThan(0),
+			ACCEPTED,
+			&LeaderBookkeeping{nil, 0, 0, 0, 0}}
+	}
+
 	r.instanceSpace[instNo].commands = append(r.instanceSpace[instNo].commands, propose.Command)
 	r.recordCommand(&propose.Command)
 	r.sync()
@@ -509,7 +498,7 @@ func (r *Replica) timerHelper(ds *DelayedSkip) {
 }
 
 func (r *Replica) handleAccept(accept *menciusoptproto.Accept) {
-	flush := true
+	// flush := true
 	inst := r.instanceSpace[accept.Instance]
 
 	if inst != nil && inst.ballot > accept.Ballot {
@@ -519,31 +508,6 @@ func (r *Replica) handleAccept(accept *menciusoptproto.Accept) {
 
 	skipStart := int32(-1)
 	skipEnd := int32(-1)
-	if accept.Skip == FALSE && r.crtInstance < accept.Instance {
-		skipStart = r.crtInstance
-		skipEnd = accept.Instance/int32(r.N)*int32(r.N) + r.Id
-		if skipEnd > accept.Instance {
-			skipEnd -= int32(r.N)
-		}
-		if r.skipsWaiting < MAX_SKIPS_WAITING {
-			//start a timer, waiting for a propose to arrive and fill this hole
-			go r.timerHelper(&DelayedSkip{skipEnd})
-			//r.delayedSkipChan <- &DelayedSkip{accept, skipStart}
-			r.skipsWaiting++
-			flush = false
-		}
-		r.instanceSpace[r.crtInstance] = &Instance{true,
-			int(skipEnd-r.crtInstance)/r.N + 1,
-			nil,
-			-1,
-			COMMITTED,
-			nil}
-
-		r.recordInstanceMetadata(r.instanceSpace[r.crtInstance])
-		r.sync()
-
-		r.crtInstance = skipEnd + int32(r.N)
-	}
 	if inst == nil {
 		skip := false
 		if accept.Skip == TRUE {
@@ -583,20 +547,7 @@ func (r *Replica) handleAccept(accept *menciusoptproto.Accept) {
 			r.replyAccept(accept.LeaderId, &menciusoptproto.AcceptReply{accept.Instance, TRUE, inst.ballot, skipStart, skipEnd})
 		}
 	}
-	if skipStart >= 0 {
-		dlog.Printf("Skipping!!\n")
-		r.bcastSkip(skipStart, skipEnd, accept.LeaderId)
-		r.updateBlocking(skipStart)
-		if flush {
-			for _, w := range r.PeerWriters {
-				if w != nil {
-					w.Flush()
-				}
-			}
-		}
-	} else {
-		r.updateBlocking(accept.Instance)
-	}
+	r.updateBlocking(accept.Instance)
 }
 
 func (r *Replica) handleDelayedSkip(delayedSkip *DelayedSkip) {
@@ -620,7 +571,7 @@ func (r *Replica) handleCommit(commit *menciusoptproto.Commit) {
 		}
 		r.instanceSpace[commit.Instance] = &Instance{skip,
 			int(commit.NbInstancesToSkip),
-			nil, //&commit.Command,
+			make([]state.Command, 1), //&commit.Command,
 			0,
 			COMMITTED,
 			nil}
@@ -787,32 +738,36 @@ func (r *Replica) updateBlocking(instance int32) {
 }
 
 func (r *Replica) executeCommands() {
-	// execedUpTo := int32(-1)
+	execedUpTo := int32(-1)
 	// skippedTo := make([]int32, r.N)
-	// skippedToOrig := make([]int32, r.N)
+	skippedToOrig := make([]int32, r.N)
 	// conflicts := make(map[state.Key]int32, 60000)
 
-	// for q := 0; q < r.N; q++ {
-	// 	skippedToOrig[q] = -1
-	// }
+	for q := 0; q < r.N; q++ {
+		skippedToOrig[q] = -1
+	}
 
-	// for !r.Shutdown {
-	// 	executed := false
-	// 	execedUpTo += 1
-	// 	for i := execedUpTo; i < r.crtInstance; i++ {
-	// 		if r.instanceSpace[execedUpTo] == nil {
-	// 			executed = false
-	// 			break
-	// 		}
-	// 		if r.instanceSpace[execedUpTo].status == COMMITTED {
+	for !r.Shutdown {
+		executed := false
+		execedUpTo += 1
+		for i := execedUpTo; i < r.crtInstance; i++ {
+			if r.instanceSpace[execedUpTo] == nil {
+				executed = false
+				break
+			}
+			if r.instanceSpace[execedUpTo].status == COMMITTED {
 
-	// 		}
-	// 		executed = true
-	// 	}
-	// 	if !executed {
-	// 		time.Sleep(time.Millisecond * 10)
-	// 	}
-	// }
+			}
+			executed = true
+		}
+		if !executed {
+			// if r.maxcommit-execedUpTo > 10 {
+			// 	r.forceCommit()
+			// }
+			fmt.Println(execedUpTo)
+			time.Sleep(time.Millisecond * 1000)
+		}
+	}
 }
 
 func (r *Replica) forceCommit() {
@@ -825,7 +780,7 @@ func (r *Replica) forceCommit() {
 		if r.instanceSpace[problemInstance] == nil {
 			r.instanceSpace[problemInstance] = &Instance{true,
 				NB_INST_TO_SKIP,
-				make([]state.Command, 0),
+				make([]state.Command, 1),
 				r.makeUniqueBallot(1),
 				PREPARING,
 				&LeaderBookkeeping{nil, 0, 0, 0, 0}}

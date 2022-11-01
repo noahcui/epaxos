@@ -182,8 +182,8 @@ func main() {
 	}
 	fmt.Println(total/uint64(*t), total, sum/time.Duration(total), ct)
 	master.Close()
-// 	for i := 0; i < *T; i++ {
-// 		readers[i].Reset(nil)
-// 		writers[i].Reset(nil)
-// 	}
-// }
+	// 	for i := 0; i < *T; i++ {
+	// 		readers[i].Reset(nil)
+	// 		writers[i].Reset(nil)
+	// 	}
+}

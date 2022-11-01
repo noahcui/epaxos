@@ -1,10 +1,18 @@
 package menciusoptproto
 
 import (
+	"bufio"
+	"encoding/binary"
 	"fastrpc"
 	"io"
+	"state"
 	"sync"
 )
+
+type byteReader interface {
+	io.Reader
+	ReadByte() (c byte, err error)
+}
 
 func (t *Skip) New() fastrpc.Serializable {
 	return new(Skip)
@@ -185,46 +193,68 @@ func (p *PrepareReplyCache) Put(t *PrepareReply) {
 	p.mu.Unlock()
 }
 func (t *PrepareReply) Marshal(wire io.Writer) {
-	for _, command := range t.Commands {
-		var b [14]byte
-		var bs []byte
-		bs = b[:14]
-		tmp32 := t.Instance
-		bs[0] = byte(tmp32)
-		bs[1] = byte(tmp32 >> 8)
-		bs[2] = byte(tmp32 >> 16)
-		bs[3] = byte(tmp32 >> 24)
-		bs[4] = byte(t.OK)
-		tmp32 = t.Ballot
-		bs[5] = byte(tmp32)
-		bs[6] = byte(tmp32 >> 8)
-		bs[7] = byte(tmp32 >> 16)
-		bs[8] = byte(tmp32 >> 24)
-		bs[9] = byte(t.Skip)
-		tmp32 = t.NbInstancesToSkip
-		bs[10] = byte(tmp32)
-		bs[11] = byte(tmp32 >> 8)
-		bs[12] = byte(tmp32 >> 16)
-		bs[13] = byte(tmp32 >> 24)
-		wire.Write(bs)
-		command.Marshal(wire)
+	// for _, command := range t.Commands {
+	var b [14]byte
+	var bs []byte
+	bs = b[:14]
+	tmp32 := t.Instance
+	bs[0] = byte(tmp32)
+	bs[1] = byte(tmp32 >> 8)
+	bs[2] = byte(tmp32 >> 16)
+	bs[3] = byte(tmp32 >> 24)
+	bs[4] = byte(t.OK)
+	tmp32 = t.Ballot
+	bs[5] = byte(tmp32)
+	bs[6] = byte(tmp32 >> 8)
+	bs[7] = byte(tmp32 >> 16)
+	bs[8] = byte(tmp32 >> 24)
+	bs[9] = byte(t.Skip)
+	tmp32 = t.NbInstancesToSkip
+	bs[10] = byte(tmp32)
+	bs[11] = byte(tmp32 >> 8)
+	bs[12] = byte(tmp32 >> 16)
+	bs[13] = byte(tmp32 >> 24)
+	// wire.Write(bs)
+	// command.Marshal(wire)
+	// }
+	wire.Write(bs)
+	bs = b[:]
+	alen1 := int64(len(t.Commands))
+	if wlen := binary.PutVarint(bs, alen1); wlen >= 0 {
+		wire.Write(b[0:wlen])
+	}
+	for i := int64(0); i < alen1; i++ {
+		t.Commands[i].Marshal(wire)
 	}
 }
 
-func (t *PrepareReply) Unmarshal(wire io.Reader) error {
-	for _, command := range t.Commands {
-		var b [14]byte
-		var bs []byte
-		bs = b[:14]
-		if _, err := io.ReadAtLeast(wire, bs, 14); err != nil {
-			return err
-		}
-		t.Instance = int32((uint32(bs[0]) | (uint32(bs[1]) << 8) | (uint32(bs[2]) << 16) | (uint32(bs[3]) << 24)))
-		t.OK = uint8(bs[4])
-		t.Ballot = int32((uint32(bs[5]) | (uint32(bs[6]) << 8) | (uint32(bs[7]) << 16) | (uint32(bs[8]) << 24)))
-		t.Skip = uint8(bs[9])
-		t.NbInstancesToSkip = int32((uint32(bs[10]) | (uint32(bs[11]) << 8) | (uint32(bs[12]) << 16) | (uint32(bs[13]) << 24)))
-		command.Unmarshal(wire)
+func (t *PrepareReply) Unmarshal(rr io.Reader) error {
+	// for _, command := range t.Commands {
+	var wire byteReader
+	var ok bool
+	var b [14]byte
+	var bs []byte
+	bs = b[:14]
+	if wire, ok = rr.(byteReader); !ok {
+		wire = bufio.NewReader(rr)
+	}
+	if _, err := io.ReadAtLeast(wire, bs, 14); err != nil {
+		return err
+	}
+	t.Instance = int32((uint32(bs[0]) | (uint32(bs[1]) << 8) | (uint32(bs[2]) << 16) | (uint32(bs[3]) << 24)))
+	t.OK = uint8(bs[4])
+	t.Ballot = int32((uint32(bs[5]) | (uint32(bs[6]) << 8) | (uint32(bs[7]) << 16) | (uint32(bs[8]) << 24)))
+	t.Skip = uint8(bs[9])
+	t.NbInstancesToSkip = int32((uint32(bs[10]) | (uint32(bs[11]) << 8) | (uint32(bs[12]) << 16) | (uint32(bs[13]) << 24)))
+	// command.Unmarshal(wire)
+	// }
+	alen1, err := binary.ReadVarint(wire)
+	if err != nil {
+		return err
+	}
+	t.Commands = make([]state.Command, alen1)
+	for i := int64(0); i < alen1; i++ {
+		t.Commands[i].Unmarshal(wire)
 	}
 	return nil
 }
@@ -266,52 +296,75 @@ func (p *AcceptCache) Put(t *Accept) {
 	p.mu.Unlock()
 }
 func (t *Accept) Marshal(wire io.Writer) {
-	for _, command := range t.Commands {
-		var b [17]byte
-		var bs []byte
-		bs = b[:17]
-		tmp32 := t.LeaderId
-		bs[0] = byte(tmp32)
-		bs[1] = byte(tmp32 >> 8)
-		bs[2] = byte(tmp32 >> 16)
-		bs[3] = byte(tmp32 >> 24)
-		tmp32 = t.Instance
-		bs[4] = byte(tmp32)
-		bs[5] = byte(tmp32 >> 8)
-		bs[6] = byte(tmp32 >> 16)
-		bs[7] = byte(tmp32 >> 24)
-		tmp32 = t.Ballot
-		bs[8] = byte(tmp32)
-		bs[9] = byte(tmp32 >> 8)
-		bs[10] = byte(tmp32 >> 16)
-		bs[11] = byte(tmp32 >> 24)
-		bs[12] = byte(t.Skip)
-		tmp32 = t.NbInstancesToSkip
-		bs[13] = byte(tmp32)
-		bs[14] = byte(tmp32 >> 8)
-		bs[15] = byte(tmp32 >> 16)
-		bs[16] = byte(tmp32 >> 24)
-		wire.Write(bs)
-		command.Marshal(wire)
+	// for _, command := range t.Commands {
+	var b [17]byte
+	var bs []byte
+	bs = b[:17]
+	tmp32 := t.LeaderId
+	bs[0] = byte(tmp32)
+	bs[1] = byte(tmp32 >> 8)
+	bs[2] = byte(tmp32 >> 16)
+	bs[3] = byte(tmp32 >> 24)
+	tmp32 = t.Instance
+	bs[4] = byte(tmp32)
+	bs[5] = byte(tmp32 >> 8)
+	bs[6] = byte(tmp32 >> 16)
+	bs[7] = byte(tmp32 >> 24)
+	tmp32 = t.Ballot
+	bs[8] = byte(tmp32)
+	bs[9] = byte(tmp32 >> 8)
+	bs[10] = byte(tmp32 >> 16)
+	bs[11] = byte(tmp32 >> 24)
+	bs[12] = byte(t.Skip)
+	tmp32 = t.NbInstancesToSkip
+	bs[13] = byte(tmp32)
+	bs[14] = byte(tmp32 >> 8)
+	bs[15] = byte(tmp32 >> 16)
+	bs[16] = byte(tmp32 >> 24)
+	// wire.Write(bs)
+	// 	command.Marshal(wire)
+	// }
+	wire.Write(bs)
+	bs = b[:]
+	alen1 := int64(len(t.Commands))
+	if wlen := binary.PutVarint(bs, alen1); wlen >= 0 {
+		wire.Write(b[0:wlen])
+	}
+	for i := int64(0); i < alen1; i++ {
+		t.Commands[i].Marshal(wire)
 	}
 }
 
-func (t *Accept) Unmarshal(wire io.Reader) error {
-	for _, command := range t.Commands {
-		var b [17]byte
-		var bs []byte
-		bs = b[:17]
-		if _, err := io.ReadAtLeast(wire, bs, 17); err != nil {
-			return err
-		}
-		t.LeaderId = int32((uint32(bs[0]) | (uint32(bs[1]) << 8) | (uint32(bs[2]) << 16) | (uint32(bs[3]) << 24)))
-		t.Instance = int32((uint32(bs[4]) | (uint32(bs[5]) << 8) | (uint32(bs[6]) << 16) | (uint32(bs[7]) << 24)))
-		t.Ballot = int32((uint32(bs[8]) | (uint32(bs[9]) << 8) | (uint32(bs[10]) << 16) | (uint32(bs[11]) << 24)))
-		t.Skip = uint8(bs[12])
-		t.NbInstancesToSkip = int32((uint32(bs[13]) | (uint32(bs[14]) << 8) | (uint32(bs[15]) << 16) | (uint32(bs[16]) << 24)))
-		command.Unmarshal(wire)
+func (t *Accept) Unmarshal(rr io.Reader) error {
+	// for _, command := range t.Commands {
+	var wire byteReader
+	var ok bool
+	if wire, ok = rr.(byteReader); !ok {
+		wire = bufio.NewReader(rr)
+	}
+	var b [17]byte
+	var bs []byte
+	bs = b[:17]
+	if _, err := io.ReadAtLeast(wire, bs, 17); err != nil {
+		return err
+	}
+	t.LeaderId = int32((uint32(bs[0]) | (uint32(bs[1]) << 8) | (uint32(bs[2]) << 16) | (uint32(bs[3]) << 24)))
+	t.Instance = int32((uint32(bs[4]) | (uint32(bs[5]) << 8) | (uint32(bs[6]) << 16) | (uint32(bs[7]) << 24)))
+	t.Ballot = int32((uint32(bs[8]) | (uint32(bs[9]) << 8) | (uint32(bs[10]) << 16) | (uint32(bs[11]) << 24)))
+	t.Skip = uint8(bs[12])
+	t.NbInstancesToSkip = int32((uint32(bs[13]) | (uint32(bs[14]) << 8) | (uint32(bs[15]) << 16) | (uint32(bs[16]) << 24)))
+	// command.Unmarshal(wire)
+	// }
+	alen1, err := binary.ReadVarint(wire)
+	if err != nil {
+		return err
+	}
+	t.Commands = make([]state.Command, alen1)
+	for i := int64(0); i < alen1; i++ {
+		t.Commands[i].Unmarshal(wire)
 	}
 	return nil
+
 }
 
 func (t *AcceptReply) New() fastrpc.Serializable {
