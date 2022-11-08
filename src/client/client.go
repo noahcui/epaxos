@@ -59,6 +59,10 @@ var end []map[int32]time.Time
 
 func clientWriter(idx int, writer *bufio.Writer, stop chan int, next chan int, wg *sync.WaitGroup) {
 	// defer wg.Done()
+	if writer == nil {
+		fmt.Println("stopping nil sender ", idx)
+		return
+	}
 	args := genericsmrproto.Propose{0 /* id */, state.Command{state.PUT, 0, 0}, 0 /* timestamp */}
 	for id := int32(0); ; id++ {
 		select {
@@ -91,6 +95,10 @@ func clientWriter(idx int, writer *bufio.Writer, stop chan int, next chan int, w
 
 func clientReader(idx int, reader *bufio.Reader, stop chan int, next chan int, wg *sync.WaitGroup) {
 	defer wg.Done()
+	if reader == nil {
+		fmt.Println("stopping nil reader", idx)
+		return
+	}
 	var reply genericsmrproto.ProposeReply
 	ticker := time.NewTicker(time.Second * time.Duration(*t))
 	for {
@@ -141,10 +149,13 @@ func main() {
 	writers := make([]*bufio.Writer, *T)
 	start = make([]map[int32]time.Time, *T)
 	end = make([]map[int32]time.Time, *T)
+	sid := 0
 	for i := 0; i < *T; i++ {
-		server, err := net.Dial("tcp", rlReply.ReplicaList[i%N])
+		server, err := net.Dial("tcp", rlReply.ReplicaList[sid%N])
+		sid++
 		if err != nil {
-			log.Println("error connecting to server ", i%N)
+			log.Println("error connecting to server ", (sid-1)%N)
+			i--
 			continue
 		}
 		reader := bufio.NewReader(server)
