@@ -1,0 +1,28 @@
+num of clients: 1
+x: 10534 
+num of total commands: 52674 
+avg latency: 44.791633ms 
+
+
+num of clients: 2
+x: 15153 
+num of total commands: 75769 
+avg latency: 48.357362ms 
+
+
+num of clients: 3
+x: 11189 
+num of total commands: 55948 
+avg latency: 161.303259ms 
+
+
+num of clients: 4
+x: 2673 
+num of total commands: 13366 
+avg latency: 1.035639939s 
+
+
+num of clients: 5
+x: 2373 
+num of total commands: 11869 
+avg latency: 1.477271223s 

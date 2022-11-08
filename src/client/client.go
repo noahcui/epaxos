@@ -67,7 +67,7 @@ func clientWriter(idx int, writer *bufio.Writer, stop chan int, next chan int, w
 	for id := int32(0); ; id++ {
 		select {
 		case <-stop:
-			fmt.Println("stopping sender ", idx)
+			// fmt.Println("stopping sender ", idx)
 			return
 		default:
 			args.CommandId = id
@@ -164,7 +164,7 @@ func main() {
 		writers[i] = writer
 	}
 	ct = make([]uint64, *T)
-	fmt.Println("start testing! waiting for results")
+	// fmt.Println("start testing! waiting for results")
 	for i := 0; i < *T; i++ {
 		ct[i] = 0
 		start[i] = make(map[int32]time.Time)
@@ -191,7 +191,7 @@ func main() {
 			total += 1
 		}
 	}
-	fmt.Println(total/uint64(*t), total, sum/time.Duration(total), ct)
+	fmt.Printf("num of clients: %v\nx: %v \nnum of total commands: %v \navg latency: %v \n\n\n", *T, total/uint64(*t), total, sum/time.Duration(total))
 	master.Close()
 	// 	for i := 0; i < *T; i++ {
 	// 		readers[i].Reset(nil)
