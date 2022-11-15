@@ -642,13 +642,13 @@ func (r *Replica) handleCommit(commit *menciusoptproto.Commit) {
 			inst.skipped = true
 		}
 		inst.nbInstSkipped = int(commit.NbInstancesToSkip)
-		if inst.lb != nil {
-			for i := 0; i < len(inst.lb.clientProposals); i++ {
-				r.ProposeChan <- inst.lb.clientProposals[i]
-				inst.lb.clientProposals[i] = nil
-			}
-			// try command in the next available instance
-		}
+		// if inst.lb != nil {
+		// 	for i := 0; i < len(inst.lb.clientProposals); i++ {
+		// 		r.ProposeChan <- inst.lb.clientProposals[i]
+		// 		inst.lb.clientProposals[i] = nil
+		// 	}
+		// 	// try command in the next available instance
+		// }
 	}
 
 	r.recordInstanceMetadata(r.instanceSpace[commit.Instance])
@@ -897,7 +897,13 @@ func (r *Replica) executeCommands() {
 			inst.status = EXECUTED
 
 			executed = true
-
+			if inst.lb != nil {
+				for i := 0; i < len(inst.lb.clientProposals); i++ {
+					r.ProposeChan <- inst.lb.clientProposals[i]
+					inst.lb.clientProposals[i] = nil
+				}
+				// try command in the next available instance
+			}
 			if !jump {
 				execedUpTo = i
 			}

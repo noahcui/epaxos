@@ -57,38 +57,66 @@ var outInfos []*outInfo
 var start []map[int32]time.Time
 var end []map[int32]time.Time
 
-func clientWriter(idx int, writer *bufio.Writer, stop chan int, next chan int, wg *sync.WaitGroup) {
+func clientWriter(idx int, writerList []*bufio.Writer, stop chan int, next chan int, wg *sync.WaitGroup) {
 	// defer wg.Done()
-	if writer == nil {
-		fmt.Println("stopping nil sender ", idx)
+	if writerList == nil {
+		fmt.Println("stopping nil sender groups ", idx)
 		return
 	}
 	args := genericsmrproto.Propose{0 /* id */, state.Command{state.PUT, 0, 0}, 0 /* timestamp */}
 	for id := int32(0); ; id++ {
 		select {
-		case <-stop:
-			// fmt.Println("stopping sender ", idx)
-			return
+		case i := <-stop:
+			fmt.Println("stopping sender ", idx)
+			writerList[i%N] = nil
+			for _, writer := range writerList {
+				if writer != nil {
+					fmt.Println("stopping sender ", i)
+					break
+				}
+				return
+			}
 		default:
-			args.CommandId = id
-			r := int(id) % 10000
-			if r < *conflicts {
-				args.Command.K = 42
-			} else {
-				args.Command.K = state.Key(r)
+			sid := rand.Int() % N
+			for {
+				if writerList[sid] == nil {
+					sid = rand.Int() % N
+					continue
+				}
+				args.CommandId = id
+				r := int(id) % 10000
+				if r < *conflicts {
+					args.Command.K = 42
+				} else {
+					args.Command.K = state.Key(r)
+				}
+				// Determine operation type
+				if *writes > rand.Intn(100) {
+					args.Command.Op = state.PUT // write operation
+				} else {
+					args.Command.Op = state.GET // read operation
+				}
+				err := writerList[sid].WriteByte(genericsmrproto.PROPOSE)
+				if err != nil {
+					fmt.Println(sid, err)
+					writerList[sid] = nil
+				}
+				args.Marshal(writerList[sid])
+				err = writerList[sid].Flush()
+				if err != nil {
+					fmt.Println(sid, err)
+					writerList[sid] = nil
+				}
+				// fmt.Println(idx, id)
+				mu.Lock()
+				start[idx][id] = time.Now()
+				mu.Unlock()
+				time.Sleep(time.Nanosecond * time.Duration(*thinktime))
+				break
 			}
-			// Determine operation type
-			if *writes > rand.Intn(100) {
-				args.Command.Op = state.PUT // write operation
-			} else {
-				args.Command.Op = state.GET // read operation
-			}
-			writer.WriteByte(genericsmrproto.PROPOSE)
-			args.Marshal(writer)
-			writer.Flush()
+
 			// out := outInfo{startTimes: time.Now()}
-			start[idx][id] = time.Now()
-			time.Sleep(time.Nanosecond * time.Duration(*thinktime))
+
 		}
 	}
 }
@@ -104,24 +132,28 @@ func clientReader(idx int, reader *bufio.Reader, stop chan int, next chan int, w
 	for {
 		select {
 		case <-ticker.C:
-			stop <- 1
+			fmt.Println("stopping reader ", idx)
+			stop <- idx
+			fmt.Println(idx, "sent out")
 			return
 		default:
 			if err := reply.Unmarshal(reader); err != nil {
 				log.Println("Error when reading:", err)
-				stop <- 1
+				stop <- idx
 				return
 			}
 			if reply.OK != 0 {
 				ct[idx]++
-				if _, notempty := end[idx][reply.CommandId]; !notempty {
-					end[idx][reply.CommandId] = time.Now()
+				mu.Lock()
+				if _, notempty := end[idx/N][reply.CommandId]; !notempty {
+					end[idx/N][reply.CommandId] = time.Now()
 				}
-
+				mu.Unlock()
+				// fmt.Println(1 / 2)
 			}
 		}
 	}
-	stop <- 1
+	stop <- idx
 }
 
 // func makeConnections()
@@ -145,37 +177,48 @@ func main() {
 	}
 	var wg sync.WaitGroup
 	N = len(rlReply.ReplicaList)
-	readers := make([]*bufio.Reader, *T)
-	writers := make([]*bufio.Writer, *T)
+	readers := make([][]*bufio.Reader, *T)
+	writers := make([][]*bufio.Writer, *T)
+
 	start = make([]map[int32]time.Time, *T)
 	end = make([]map[int32]time.Time, *T)
-	sid := 0
 	for i := 0; i < *T; i++ {
-		server, err := net.Dial("tcp", rlReply.ReplicaList[sid%N])
-		sid++
-		if err != nil {
-			log.Println("error connecting to server ", (sid-1)%N)
-			i--
-			continue
+		readers[i] = make([]*bufio.Reader, 0)
+		writers[i] = make([]*bufio.Writer, 0)
+		for j := 0; j < N; j++ {
+			server, err := net.Dial("tcp", rlReply.ReplicaList[j])
+			if err != nil {
+				log.Println("error connecting to server ", j)
+				// i--
+				readers[i] = append(readers[i], nil)
+				writers[i] = append(writers[i], nil)
+				continue
+			}
+			reader := bufio.NewReader(server)
+			writer := bufio.NewWriter(server)
+			readers[i] = append(readers[i], reader)
+			writers[i] = append(writers[i], writer)
 		}
-		reader := bufio.NewReader(server)
-		writer := bufio.NewWriter(server)
-		readers[i] = reader
-		writers[i] = writer
-	}
-	ct = make([]uint64, *T)
-	// fmt.Println("start testing! waiting for results")
-	for i := 0; i < *T; i++ {
-		ct[i] = 0
-		start[i] = make(map[int32]time.Time)
-		end[i] = make(map[int32]time.Time)
-		done := make(chan int)
-		next := make(chan int)
-		wg.Add(1)
-		go clientReader(i, readers[i], done, next, &wg)
-		go clientWriter(i, writers[i], done, next, &wg)
 	}
 
+	ct = make([]uint64, *T*N)
+	// fmt.Println("start testing! waiting for results")
+	j := 0
+	for i := 0; i < *T; i++ {
+		done := make(chan int, N)
+		next := make(chan int, N)
+		for _, reader := range readers[i] {
+			ct[j] = 0
+			start[i] = make(map[int32]time.Time)
+			end[i] = make(map[int32]time.Time)
+			wg.Add(1)
+			go clientReader(j, reader, done, next, &wg)
+			j++
+		}
+
+		go clientWriter(i, writers[i], done, next, &wg)
+	}
+	fmt.Println("testing started!")
 	wg.Wait()
 	var total uint64
 	total = 0
@@ -184,7 +227,9 @@ func main() {
 	var ls []time.Duration
 	for idx, endtimes := range end {
 		for cid, etime := range endtimes {
+			mu.Lock()
 			stime := start[idx][cid]
+			mu.Unlock()
 			l := etime.Sub(stime)
 			ls = append(ls, l)
 			sum += l
