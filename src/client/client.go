@@ -63,57 +63,69 @@ func clientWriter(idx int, writerList []*bufio.Writer, stop chan int, next chan 
 		fmt.Println("stopping nil sender groups ", idx)
 		return
 	}
+	fmt.Println(writerList)
 	args := genericsmrproto.Propose{0 /* id */, state.Command{state.PUT, 0, 0}, 0 /* timestamp */}
 	for id := int32(0); ; id++ {
 		select {
 		case i := <-stop:
 			fmt.Println("stopping sender ", idx)
 			writerList[i%N] = nil
+			stop := true
 			for _, writer := range writerList {
 				if writer != nil {
 					fmt.Println("stopping sender ", i)
-					break
+					stop = false
 				}
+			}
+			fmt.Println("all connections are nil, stopping sender", idx)
+			if stop {
 				return
 			}
 		default:
+
+			// for {
 			sid := rand.Int() % N
-			for {
-				if writerList[sid] == nil {
-					sid = rand.Int() % N
-					continue
+			writer := writerList[sid]
+			for writer == nil {
+				sid = rand.Int() % N
+				writer = writerList[sid]
+				if writer != nil {
+					// fmt.Printf("redirecting msg from %v to a new server, %v, %v\n", sid, writerList, writer)
+					break
 				}
-				args.CommandId = id
-				r := int(id) % 10000
-				if r < *conflicts {
-					args.Command.K = 42
-				} else {
-					args.Command.K = state.Key(r)
-				}
-				// Determine operation type
-				if *writes > rand.Intn(100) {
-					args.Command.Op = state.PUT // write operation
-				} else {
-					args.Command.Op = state.GET // read operation
-				}
-				err := writerList[sid].WriteByte(genericsmrproto.PROPOSE)
-				if err != nil {
-					fmt.Println(sid, err)
-					writerList[sid] = nil
-				}
-				args.Marshal(writerList[sid])
-				err = writerList[sid].Flush()
-				if err != nil {
-					fmt.Println(sid, err)
-					writerList[sid] = nil
-				}
-				// fmt.Println(idx, id)
-				mu.Lock()
-				start[idx][id] = time.Now()
-				mu.Unlock()
-				time.Sleep(time.Nanosecond * time.Duration(*thinktime))
-				break
 			}
+			// fmt.Println("now sending", id)
+			args.CommandId = id
+			r := int(id) % 10000
+			if r < *conflicts {
+				args.Command.K = 42
+			} else {
+				args.Command.K = state.Key(r)
+			}
+			// Determine operation type
+			if *writes > rand.Intn(100) {
+				args.Command.Op = state.PUT // write operation
+			} else {
+				args.Command.Op = state.GET // read operation
+			}
+			err := writerList[sid].WriteByte(genericsmrproto.PROPOSE)
+			if err != nil {
+				fmt.Println(sid, err)
+				writerList[sid] = nil
+			}
+			args.Marshal(writerList[sid])
+			err = writerList[sid].Flush()
+			if err != nil {
+				fmt.Println(sid, err)
+				writerList[sid] = nil
+			}
+			// fmt.Println(idx, id)
+			mu.Lock()
+			start[idx][id] = time.Now()
+			mu.Unlock()
+			time.Sleep(time.Nanosecond * time.Duration(*thinktime))
+			// break
+			// }
 
 			// out := outInfo{startTimes: time.Now()}
 
@@ -137,6 +149,7 @@ func clientReader(idx int, reader *bufio.Reader, stop chan int, next chan int, w
 			fmt.Println(idx, "sent out")
 			return
 		default:
+			// fmt.Println("for new msg!")
 			if err := reply.Unmarshal(reader); err != nil {
 				log.Println("Error when reading:", err)
 				stop <- idx
@@ -207,12 +220,12 @@ func main() {
 	for i := 0; i < *T; i++ {
 		done := make(chan int, N)
 		next := make(chan int, N)
+		start[i] = make(map[int32]time.Time)
+		end[i] = make(map[int32]time.Time)
 		for _, reader := range readers[i] {
 			ct[j] = 0
-			start[i] = make(map[int32]time.Time)
-			end[i] = make(map[int32]time.Time)
-			wg.Add(1)
 			go clientReader(j, reader, done, next, &wg)
+			wg.Add(1)
 			j++
 		}
 

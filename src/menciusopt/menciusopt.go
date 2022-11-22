@@ -15,8 +15,8 @@ import (
 )
 
 const CHAN_BUFFER_SIZE = 200000
-const WAIT_BEFORE_SKIP_MS = 50
-const NB_INST_TO_SKIP = 100
+const WAIT_BEFORE_SKIP_MS = 5
+const NB_INST_TO_SKIP = 10
 const MAX_SKIPS_WAITING = 2
 const TRUE = uint8(1)
 const FALSE = uint8(0)
@@ -197,11 +197,12 @@ func (r *Replica) run() {
 				r.instanceSpace[r.crtInstance] = &Instance{
 					false,
 					0,
-					make([]state.Command, 1),
+					make([]state.Command, 0),
 					r.makeBallotLargerThan(0),
 					ACCEPTED,
-					&LeaderBookkeeping{make([]*genericsmr.Propose, 1), 0, 0, 0, 0},
+					&LeaderBookkeeping{make([]*genericsmr.Propose, 0), 0, 0, 0, 0},
 				}
+				r.instanceSpace[r.crtInstance].commands = append(r.instanceSpace[r.crtInstance].commands, state.Command{state.NONE, 0, 0})
 			}
 			r.recordInstanceMetadata(r.instanceSpace[r.crtInstance])
 			r.bcastAccept(r.crtInstance, r.instanceSpace[r.crtInstance].ballot, FALSE, 0, r.instanceSpace[r.crtInstance].commands)
@@ -211,6 +212,7 @@ func (r *Replica) run() {
 
 		case propose := <-r.ProposeChan:
 			//got a Propose from a client
+			// fmt.Println("New proposol! ", propose)
 			dlog.Printf("Proposal with id %d\n", propose.CommandId)
 			r.handlePropose(propose)
 			break
@@ -279,7 +281,7 @@ func (r *Replica) run() {
 
 func (r *Replica) clock() {
 	for !r.Shutdown {
-		time.Sleep(100 * 1000 * 1000)
+		time.Sleep(10 * 1000 * 1000)
 		r.clockChan <- true
 	}
 }
@@ -451,11 +453,17 @@ func (r *Replica) handlePropose(propose *genericsmr.Propose) {
 	if r.instanceSpace[r.crtInstance] == nil {
 		r.instanceSpace[r.crtInstance] = &Instance{false,
 			0,
-			make([]state.Command, 1),
+			make([]state.Command, 0),
 			r.makeBallotLargerThan(0),
 			ACCEPTED,
-			&LeaderBookkeeping{make([]*genericsmr.Propose, 1), 0, 0, 0, 0},
+			&LeaderBookkeeping{make([]*genericsmr.Propose, 0), 0, 0, 0, 0},
 		}
+	}
+	if r.instanceSpace[instNo].commands == nil {
+		r.instanceSpace[instNo].commands = make([]state.Command, 0)
+	}
+	if r.instanceSpace[instNo].lb == nil {
+		r.instanceSpace[instNo].lb = &LeaderBookkeeping{make([]*genericsmr.Propose, 0), 0, 0, 0, 0}
 	}
 	r.instanceSpace[instNo].commands = append(r.instanceSpace[instNo].commands, propose.Command)
 	r.instanceSpace[instNo].lb.clientProposals = append(r.instanceSpace[instNo].lb.clientProposals, propose)
@@ -470,7 +478,8 @@ func (r *Replica) handleSkip(skip *menciusoptproto.Skip) {
 		nil,
 		0,
 		COMMITTED,
-		nil}
+		nil,
+	}
 	r.updateBlocking(skip.StartInstance)
 }
 
@@ -491,14 +500,17 @@ func (r *Replica) handlePrepare(prepare *menciusoptproto.Prepare) {
 			nil,
 			prepare.Ballot,
 			PREPARING,
-			nil}
+			nil,
+		}
 	} else {
 		ok := TRUE
 		if prepare.Ballot < inst.ballot {
 			ok = FALSE
+			log.Println("prepare ballot", prepare.Ballot, "instant ballot", inst.ballot)
 		}
 		if inst.commands == nil {
-			inst.commands = make([]state.Command, 1)
+			inst.commands = make([]state.Command, 0)
+			inst.commands = append(inst.commands, state.Command{state.NONE, 0, 0})
 		}
 		skipped := FALSE
 		if inst.skipped {
@@ -542,12 +554,16 @@ func (r *Replica) handleAccept(accept *menciusoptproto.Accept) {
 			r.skipsWaiting++
 			flush = false
 		}
+		// if r.instanceSpace[r.crtInstance] == nil {
+		// fmt.Println("hello there")
 		r.instanceSpace[r.crtInstance] = &Instance{true,
 			int(skipEnd-r.crtInstance)/r.N + 1,
 			nil,
 			-1,
 			COMMITTED,
-			nil}
+			nil,
+		}
+		// }
 
 		r.recordInstanceMetadata(r.instanceSpace[r.crtInstance])
 		r.sync()
@@ -564,9 +580,10 @@ func (r *Replica) handleAccept(accept *menciusoptproto.Accept) {
 			accept.Commands,
 			accept.Ballot,
 			ACCEPTED,
-			nil}
+			&LeaderBookkeeping{make([]*genericsmr.Propose, 0), 0, 0, 0, 0},
+		}
 		r.recordInstanceMetadata(r.instanceSpace[accept.Instance])
-		for i := 1; i < len(accept.Commands); i++ {
+		for i := 0; i < len(accept.Commands); i++ {
 			r.recordCommand(&accept.Commands[i])
 		}
 		r.sync()
@@ -630,10 +647,12 @@ func (r *Replica) handleCommit(commit *menciusoptproto.Commit) {
 		}
 		r.instanceSpace[commit.Instance] = &Instance{skip,
 			int(commit.NbInstancesToSkip),
-			nil, //&commit.Command,
+			// nil, //&commit.Command,
+			nil,
 			0,
 			COMMITTED,
-			nil}
+			nil,
+		}
 	} else {
 		//inst.command = &commit.Command
 		inst.status = COMMITTED
@@ -642,13 +661,13 @@ func (r *Replica) handleCommit(commit *menciusoptproto.Commit) {
 			inst.skipped = true
 		}
 		inst.nbInstSkipped = int(commit.NbInstancesToSkip)
-		// if inst.lb != nil {
-		// 	for i := 0; i < len(inst.lb.clientProposals); i++ {
-		// 		r.ProposeChan <- inst.lb.clientProposals[i]
-		// 		inst.lb.clientProposals[i] = nil
-		// 	}
-		// 	// try command in the next available instance
-		// }
+		if inst.lb != nil {
+			// try command in the next available instance
+			for i := 0; i < len(inst.lb.clientProposals); i++ {
+				r.ProposeChan <- inst.lb.clientProposals[i]
+				inst.lb.clientProposals[i] = nil
+			}
+		}
 	}
 
 	r.recordInstanceMetadata(r.instanceSpace[commit.Instance])
@@ -724,7 +743,8 @@ func (r *Replica) handleAcceptReply(areply *menciusoptproto.AcceptReply) {
 				nil,
 				0,
 				COMMITTED,
-				nil}
+				nil,
+			}
 			r.updateBlocking(areply.SkippedStartInstance)
 		}
 
@@ -769,6 +789,7 @@ func (r *Replica) updateBlocking(instance int32) {
 	}
 
 	for r.blockingInstance = r.blockingInstance; true; r.blockingInstance++ {
+
 		if r.blockingInstance <= r.skippedTo[int(r.blockingInstance)%r.N] {
 			continue
 		}
@@ -784,17 +805,22 @@ func (r *Replica) updateBlocking(instance int32) {
 			return
 		}
 		if r.blockingInstance%int32(r.N) == r.Id || inst.lb != nil {
+
 			if inst.status == READY {
 				//commit my instance
+				// fmt.Println("here", instance, inst.lb.clientProposals)
 				dlog.Printf("Am about to commit instance %d\n", r.blockingInstance)
 
 				inst.status = COMMITTED
 				if inst.lb.clientProposals != nil && !r.Dreply {
 					// give client the all clear
-					for i := 1; i < len(inst.lb.clientProposals); i++ {
+					// fmt.Println(inst.lb.clientProposals, inst.commands)
+					for i := 0; i < len(inst.lb.clientProposals); i++ {
 						dlog.Printf("Sending ACK for req. %d\n", inst.lb.clientProposals[i].CommandId)
+						// fmt.Println("hey, I amhere")
 						r.ReplyProposeTS(&genericsmrproto.ProposeReplyTS{TRUE, inst.lb.clientProposals[i].CommandId, state.NIL, inst.lb.clientProposals[i].Timestamp},
 							inst.lb.clientProposals[i].Reply)
+						// fmt.Println("replied", i, instance)
 					}
 
 				}
@@ -827,18 +853,19 @@ func (r *Replica) executeCommands() {
 	skippedTo := make([]int32, r.N)
 	skippedToOrig := make([]int32, r.N)
 	conflicts := make(map[state.Key]int32, 60000)
-
+	// fmt.Println("WTF")
 	for q := 0; q < r.N; q++ {
 		skippedToOrig[q] = -1
 	}
-	return // study this later
-	//
+	// return // study this later
+	// //
 	for !r.Shutdown {
 		executed := false
 		jump := false
 		copy(skippedTo, skippedToOrig)
+		// fmt.Println(execedUpTo)
 		for i := execedUpTo + 1; i < r.crtInstance; i++ {
-
+			// fmt.Println(execedUpTo)
 			if i < skippedTo[i%int32(r.N)] {
 				continue
 			}
@@ -854,7 +881,8 @@ func (r *Replica) executeCommands() {
 			if r.instanceSpace[i].status != COMMITTED {
 				// TODO: study this later
 
-				if !r.instanceSpace[i].skipped {
+				if !r.instanceSpace[i].skipped && r.instanceSpace[i].commands != nil {
+
 					confInst, present := conflicts[r.instanceSpace[i].commands[0].K]
 					if present && r.instanceSpace[confInst].status != EXECUTED {
 						break
@@ -885,7 +913,7 @@ func (r *Replica) executeCommands() {
 			if present && confInst < i && r.instanceSpace[confInst].status != EXECUTED && state.Conflict(&r.instanceSpace[confInst].commands[0], &inst.commands[0]) {
 				break
 			}
-			for idx := 0; idx < len(inst.commands); idx++ {
+			for idx := 1; idx < len(inst.commands); idx++ {
 				inst.commands[idx].Execute(r.State)
 				if r.Dreply && inst.lb != nil && inst.lb.clientProposals[idx] != nil {
 					dlog.Printf("Sending ACK for req. %d\n", inst.lb.clientProposals[idx].CommandId)
@@ -897,16 +925,10 @@ func (r *Replica) executeCommands() {
 			inst.status = EXECUTED
 
 			executed = true
-			if inst.lb != nil {
-				for i := 0; i < len(inst.lb.clientProposals); i++ {
-					r.ProposeChan <- inst.lb.clientProposals[i]
-					inst.lb.clientProposals[i] = nil
-				}
-				// try command in the next available instance
-			}
 			if !jump {
 				execedUpTo = i
 			}
+
 		}
 		if !executed {
 			time.Sleep(1000 * 1000)
@@ -922,14 +944,15 @@ func (r *Replica) forceCommit() {
 
 	//try to take over the problem instance
 	if int(problemInstance)%r.N == int(r.Id+1)%r.N {
-		log.Println("Replica", r.Id, "r.N=", r.N, "Trying to take over instance", problemInstance)
+		log.Println("Replica", r.Id, "r.N=", r.N, "Trying to take over instance", problemInstance, "blocked at", r.blockingInstance)
 		if r.instanceSpace[problemInstance] == nil {
 			r.instanceSpace[problemInstance] = &Instance{true,
 				NB_INST_TO_SKIP,
-				make([]state.Command, 1),
+				make([]state.Command, 0),
 				r.makeUniqueBallot(1),
 				PREPARING,
-				&LeaderBookkeeping{make([]*genericsmr.Propose, 1), 0, 0, 0, 0}}
+				&LeaderBookkeeping{make([]*genericsmr.Propose, 0), 0, 0, 0, 0}}
+			r.instanceSpace[problemInstance].commands = append(r.instanceSpace[problemInstance].commands, state.Command{state.NONE, 0, 0})
 			r.bcastPrepare(problemInstance, r.instanceSpace[problemInstance].ballot)
 		} else {
 			log.Println("Not nil")
