@@ -15,8 +15,8 @@ import (
 )
 
 const CHAN_BUFFER_SIZE = 200000
-const WAIT_BEFORE_SKIP_MS = 50
-const NB_INST_TO_SKIP = 100
+const WAIT_BEFORE_SKIP_MS = 5
+const NB_INST_TO_SKIP = 10
 const MAX_SKIPS_WAITING = 2
 const TRUE = uint8(1)
 const FALSE = uint8(0)
@@ -263,7 +263,7 @@ func (r *Replica) run() {
 
 func (r *Replica) clock() {
 	for !r.Shutdown {
-		time.Sleep(100 * 1000 * 1000)
+		time.Sleep(10 * 1000 * 1000)
 		r.clockChan <- true
 	}
 }
@@ -827,7 +827,7 @@ func (r *Replica) executeCommands() {
 			}
 
 			if r.instanceSpace[i].status != COMMITTED {
-				if !r.instanceSpace[i].skipped {
+				if !r.instanceSpace[i].skipped && r.instanceSpace[i].command != nil {
 					confInst, present := conflicts[r.instanceSpace[i].command.K]
 					if present && r.instanceSpace[confInst].status != EXECUTED {
 						break
