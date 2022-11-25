@@ -1,0 +1,152 @@
+testing started!
+[0xc0001fca00 0xc0001fca40 0xc0001fca80]
+[0xc0001fc340 0xc0001fc380 0xc0001fc3c0]
+[0xc0001fc400 0xc0001fc440 0xc0001fc480]
+[0xc0001fc880 0xc0001fc8c0 0xc0001fc900]
+[0xc0001fc940 0xc0001fc980 0xc0001fc9c0]
+[0xc0001fc700 0xc0001fc740 0xc0001fc780]
+[0xc0001fc7c0 0xc0001fc800 0xc0001fc840]
+[0xc0001fc4c0 0xc0001fc500 0xc0001fc540]
+[0xc0001fc580 0xc0001fc5c0 0xc0001fc600]
+[0xc0001fc640 0xc0001fc680 0xc0001fc6c0]
+stopping sender  4
+stopping sender  12
+stopping sender  12
+stopping sender  1
+stopping sender  3
+stopping sender  3
+stopping sender  6
+stopping sender  18
+stopping sender  18
+stopping sender  8
+stopping sender  24
+stopping sender  24
+stopping sender  3
+stopping sender  9
+stopping sender  9
+stopping sender  0
+stopping sender  0
+stopping sender  0
+stopping sender  5
+stopping sender  15
+stopping sender  15
+stopping sender  2
+stopping sender  6
+stopping sender  6
+stopping sender  9
+stopping sender  27
+stopping sender  27
+stopping sender  7
+stopping sender  21
+stopping sender  21
+stopping reader  23
+stopping reader  26
+26 sent out
+stopping reader  29
+29 sent out
+stopping reader  14
+14 sent out
+23 sent out
+stopping reader  8
+8 sent out
+stopping reader  20
+20 sent out
+stopping reader  17
+17 sent out
+stopping reader  11
+11 sent out
+stopping reader  5
+5 sent out
+stopping reader  22
+22 sent out
+stopping reader  13
+13 sent out
+stopping reader  16
+16 sent out
+stopping reader  1
+1 sent out
+stopping reader  10
+10 sent out
+stopping reader  7
+7 sent out
+stopping reader  4
+4 sent out
+stopping reader  28
+28 sent out
+stopping reader  2
+2 sent out
+stopping reader  19
+19 sent out
+stopping reader  25
+stopping sender  5
+stopping sender  17
+stopping sender  5
+stopping sender  7
+stopping sender  23
+stopping sender  7
+all connections are nil, stopping sender 7
+all connections are nil, stopping sender 5
+stopping sender  8
+stopping sender  26
+stopping sender  8
+stopping sender  1
+stopping sender  5
+stopping sender  1
+all connections are nil, stopping sender 1
+stopping sender  6
+stopping sender  20
+stopping sender  6
+all connections are nil, stopping sender 6
+stopping sender  0
+stopping sender  1
+stopping sender  0
+all connections are nil, stopping sender 0
+all connections are nil, stopping sender 8
+25 sent out
+stopping sender  9
+stopping sender  29
+stopping sender  9
+all connections are nil, stopping sender 9
+stopping sender  2
+stopping sender  8
+stopping sender  2
+all connections are nil, stopping sender 2
+stopping sender  4
+stopping sender  14
+stopping sender  4
+all connections are nil, stopping sender 4
+stopping sender  3
+stopping sender  11
+stopping sender  3
+all connections are nil, stopping sender 3
+num of clients: 10
+x: 6399 
+num of total commands: 127980 
+avg latency: 14.038914ms 
+ totalout: 180043
+
+
+------------------------------------------------------
+DETAILED RESULTS(second, throughput, average latency)
+------------------------------------------------------
+0 , 3135 , 4.971829ms
+1 , 2931 , 4.80709ms
+2 , 3058 , 5.044258ms
+3 , 3070 , 5.046872ms
+4 , 3062 , 5.039711ms
+5 , 7341 , 158.134998ms
+6 , 7481 , 5.341413ms
+7 , 7428 , 5.347073ms
+8 , 7495 , 5.332957ms
+9 , 7550 , 5.30888ms
+10 , 7631 , 5.211209ms
+11 , 7612 , 5.253108ms
+12 , 7610 , 5.287053ms
+13 , 7597 , 5.261086ms
+14 , 7583 , 5.280998ms
+15 , 7551 , 5.257896ms
+16 , 7436 , 5.36536ms
+17 , 7475 , 5.418189ms
+18 , 7457 , 5.324552ms
+19 , 7461 , 5.378572ms
+20 , 16 , 8.58525ms

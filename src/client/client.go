@@ -48,7 +48,7 @@ type outInfo struct {
 var mu sync.Mutex
 
 var N int
-
+var totalout int
 var successful []int
 var ct []uint64
 var rarray []int
@@ -77,8 +77,8 @@ func clientWriter(idx int, writerList []*bufio.Writer, stop chan int, next chan 
 					stop = false
 				}
 			}
-			fmt.Println("all connections are nil, stopping sender", idx)
 			if stop {
+				fmt.Println("all connections are nil, stopping sender", idx)
 				return
 			}
 		default:
@@ -102,6 +102,9 @@ func clientWriter(idx int, writerList []*bufio.Writer, stop chan int, next chan 
 			} else {
 				args.Command.K = state.Key(r)
 			}
+			now := time.Now()
+			args.Timestamp = now.UnixNano()
+			// fmt.Println(now, time.Unix(0, args.Timestamp))
 			// Determine operation type
 			if *writes > rand.Intn(100) {
 				args.Command.Op = state.PUT // write operation
@@ -121,9 +124,10 @@ func clientWriter(idx int, writerList []*bufio.Writer, stop chan int, next chan 
 			}
 			// fmt.Println(idx, id)
 			mu.Lock()
-			start[idx][id] = time.Now()
+			// start[idx][id] = time.Now()
+			totalout += 1
 			mu.Unlock()
-			time.Sleep(time.Nanosecond * time.Duration(*thinktime))
+			time.Sleep(time.Nanosecond * time.Duration(*thinktime*1000*1000))
 			// break
 			// }
 
@@ -139,8 +143,9 @@ func clientReader(idx int, reader *bufio.Reader, stop chan int, next chan int, w
 		fmt.Println("stopping nil reader", idx)
 		return
 	}
-	var reply genericsmrproto.ProposeReply
+	var reply genericsmrproto.ProposeReplyTS
 	ticker := time.NewTicker(time.Second * time.Duration(*t))
+	// next <- 0
 	for {
 		select {
 		case <-ticker.C:
@@ -150,16 +155,21 @@ func clientReader(idx int, reader *bufio.Reader, stop chan int, next chan int, w
 			return
 		default:
 			// fmt.Println("for new msg!")
+
 			if err := reply.Unmarshal(reader); err != nil {
 				log.Println("Error when reading:", err)
+				// next <- 0
 				stop <- idx
 				return
 			}
+
 			if reply.OK != 0 {
 				ct[idx]++
 				mu.Lock()
 				if _, notempty := end[idx/N][reply.CommandId]; !notempty {
-					end[idx/N][reply.CommandId] = time.Now()
+					end[idx][reply.CommandId] = time.Now()
+					start[idx][reply.CommandId] = time.Unix(0, reply.Timestamp)
+					// next <- 0
 				}
 				mu.Unlock()
 				// fmt.Println(1 / 2)
@@ -168,6 +178,8 @@ func clientReader(idx int, reader *bufio.Reader, stop chan int, next chan int, w
 	}
 	stop <- idx
 }
+
+var maxindex int
 
 // func makeConnections()
 func main() {
@@ -193,8 +205,8 @@ func main() {
 	readers := make([][]*bufio.Reader, *T)
 	writers := make([][]*bufio.Writer, *T)
 
-	start = make([]map[int32]time.Time, *T)
-	end = make([]map[int32]time.Time, *T)
+	start = make([]map[int32]time.Time, *T*N)
+	end = make([]map[int32]time.Time, *T*N)
 	for i := 0; i < *T; i++ {
 		readers[i] = make([]*bufio.Reader, 0)
 		writers[i] = make([]*bufio.Writer, 0)
@@ -216,13 +228,15 @@ func main() {
 
 	ct = make([]uint64, *T*N)
 	// fmt.Println("start testing! waiting for results")
+	starttime := time.Now()
 	j := 0
 	for i := 0; i < *T; i++ {
 		done := make(chan int, N)
 		next := make(chan int, N)
-		start[i] = make(map[int32]time.Time)
-		end[i] = make(map[int32]time.Time)
+
 		for _, reader := range readers[i] {
+			start[j] = make(map[int32]time.Time)
+			end[j] = make(map[int32]time.Time)
 			ct[j] = 0
 			go clientReader(j, reader, done, next, &wg)
 			wg.Add(1)
@@ -234,25 +248,86 @@ func main() {
 	fmt.Println("testing started!")
 	wg.Wait()
 	var total uint64
+	maxindex = -1
 	total = 0
 	var sum time.Duration
+	sum = 0
+	total = 0
 	// latencies:= make(heap)
 	var ls []time.Duration
+	onesecondslides := make(map[int][]time.Duration)
+	index := 0
 	for idx, endtimes := range end {
 		for cid, etime := range endtimes {
 			mu.Lock()
 			stime := start[idx][cid]
 			mu.Unlock()
 			l := etime.Sub(stime)
+			// fmt.Println(stime, "||", etime)
 			ls = append(ls, l)
 			sum += l
 			total += 1
+			index, err = getindex(starttime, etime)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+			if onesecondslides[index] == nil {
+				onesecondslides[index] = make([]time.Duration, 0)
+			}
+			onesecondslides[index] = append(onesecondslides[index], l)
 		}
 	}
-	fmt.Printf("num of clients: %v\nx: %v \nnum of total commands: %v \navg latency: %v \n\n\n", *T, total/uint64(*t), total, sum/time.Duration(total))
+	fmt.Printf("num of clients: %v\nx: %v \nnum of total commands: %v \navg latency: %v \n totalout: %v\n\n\n", *T, total/uint64(*t), total, sum/time.Duration(total), totalout)
+
+	fmt.Println("------------------------------------------------------")
+	fmt.Println("DETAILED RESULTS(second, throughput, average latency)")
+	fmt.Println("------------------------------------------------------")
+	maxindex = getmaxindex(onesecondslides)
+	for i := 0; i <= maxindex; i++ {
+		items := onesecondslides[i]
+		var subsum time.Duration
+		var subtotal uint64
+		subsum = 0
+		subtotal = 0
+		if items != nil {
+			for _, item := range items {
+				subsum += item
+				subtotal += 1
+			}
+			fmt.Println(i, ",", subtotal, ",", subsum/time.Duration(subtotal))
+		} else {
+			fmt.Println(i, ",", "nil")
+		}
+	}
 	master.Close()
 	// 	for i := 0; i < *T; i++ {
 	// 		readers[i].Reset(nil)
 	// 		writers[i].Reset(nil)
 	// 	}
+}
+
+func getmaxindex(m map[int][]time.Duration) int {
+	max := 0
+	for idx, _ := range m {
+		if idx > max {
+			max = idx
+		}
+	}
+	return max
+}
+
+func getindex(start time.Time, now time.Time) (int, error) {
+	index := 0
+	for {
+		now = now.Add(-time.Second)
+		if now.Before(start) {
+			return index, nil
+		}
+		index++
+		if index > 9999 {
+			return -1, fmt.Errorf("idx bigger than 9999\n")
+		}
+	}
+	return -1, nil
 }
