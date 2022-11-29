@@ -16,7 +16,7 @@ import (
 
 const CHAN_BUFFER_SIZE = 200000
 const WAIT_BEFORE_SKIP_MS = 50
-const NB_INST_TO_SKIP = 100000
+const NB_INST_TO_SKIP = -1000
 const MAX_SKIPS_WAITING = 20
 const TRUE = uint8(1)
 const FALSE = uint8(0)
@@ -49,6 +49,7 @@ type Replica struct {
 	counter                  int
 	skippedTo                []int32
 	takeOver                 int32
+	resetTicker              bool
 }
 
 type DelayedSkip struct {
@@ -109,6 +110,7 @@ func NewReplica(id int, peerAddrList []string, thrifty bool, exec bool, dreply b
 		0,
 		skippedTo,
 		-1,
+		false,
 	}
 
 	r.Durable = durable
@@ -172,11 +174,15 @@ func (r *Replica) replyAccept(replicaId int32, reply *menciusoptproto.AcceptRepl
 	r.SendMsg(replicaId, r.acceptReplyRPC, reply)
 }
 
-func (r *Replica) broadAccpetFor(instanceID int32) {
+func (r *Replica) broadAccpetFor(instanceID int32, skip bool) {
+	toskip := 0
+	if skip {
+		toskip = 10000
+	}
 	if r.instanceSpace[instanceID] == nil {
 		r.instanceSpace[instanceID] = &Instance{
 			false,
-			0,
+			toskip,
 			make([]state.Command, 0),
 			r.makeBallotLargerThan(0),
 			ACCEPTED,
@@ -206,26 +212,24 @@ func (r *Replica) run() {
 		fmt.Println("makesure changes applied, hello")
 		go r.executeCommands()
 	}
-	bTicker := time.NewTicker(time.Millisecond * 10)
+	bTicker := time.NewTicker(time.Millisecond * 1)
 	go r.clock()
 
 	for !r.Shutdown {
 
 		select {
 		case <-bTicker.C:
-			r.broadAccpetFor(r.crtInstance)
-			// if r.takeOver > 0 {
-			// 	takeoverid := r.takeOver - r.Id + r.crtInstance
-			// 	r.broadAccpetFor(takeoverid)
-			// }
-			r.crtInstance += int32(r.N)
-			break
+			if r.resetTicker {
+				r.resetTicker = false
+				break
+			}
+			r.broadAccpetFor(r.crtInstance, false)
+			if r.takeOver > 0 {
+				takeoverid := r.takeOver - r.Id + r.crtInstance
+				r.broadAccpetFor(takeoverid, false)
+			}
 
-		case propose := <-r.ProposeChan:
-			//got a Propose from a client
-			// fmt.Println("New proposol! ", propose)
-			dlog.Printf("Proposal with id %d\n", propose.CommandId)
-			r.handlePropose(propose)
+			r.crtInstance += int32(r.N)
 			break
 
 		case skipS := <-r.skipChan:
@@ -271,6 +275,13 @@ func (r *Replica) run() {
 
 		case delayedSkip := <-r.delayedSkipChan:
 			r.handleDelayedSkip(delayedSkip)
+			break
+
+		case propose := <-r.ProposeChan:
+			//got a Propose from a client
+			// fmt.Println("New proposol! ", propose)
+			dlog.Printf("Proposal with id %d\n", propose.CommandId)
+			r.handlePropose(propose)
 			break
 
 		case <-r.clockChan:
@@ -485,6 +496,7 @@ func (r *Replica) handlePropose(propose *genericsmr.Propose) {
 }
 
 func (r *Replica) handleSkip(skip *menciusoptproto.Skip) {
+	fmt.Println("still skipping!")
 	r.instanceSpace[skip.StartInstance] = &Instance{true,
 		int(skip.EndInstance-skip.StartInstance)/r.N + 1,
 		nil,
@@ -543,7 +555,7 @@ func (r *Replica) timerHelper(ds *DelayedSkip) {
 }
 
 func (r *Replica) handleAccept(accept *menciusoptproto.Accept) {
-	flush := true
+	// flush := true
 	inst := r.instanceSpace[accept.Instance]
 
 	if inst != nil && inst.ballot > accept.Ballot {
@@ -554,34 +566,42 @@ func (r *Replica) handleAccept(accept *menciusoptproto.Accept) {
 	skipStart := int32(-1)
 	skipEnd := int32(-1)
 	if accept.Skip == FALSE && r.crtInstance < accept.Instance {
-		skipStart = r.crtInstance
-		skipEnd = accept.Instance/int32(r.N)*int32(r.N) + r.Id
-		if skipEnd > accept.Instance {
-			skipEnd -= int32(r.N)
+		r.broadAccpetFor(r.crtInstance, false)
+		if r.takeOver > 0 {
+			takeoverid := r.takeOver - r.Id + r.crtInstance
+			r.broadAccpetFor(takeoverid, false)
 		}
-		if r.skipsWaiting < MAX_SKIPS_WAITING {
-			//start a timer, waiting for a propose to arrive and fill this hole
-			go r.timerHelper(&DelayedSkip{skipEnd})
-			//r.delayedSkipChan <- &DelayedSkip{accept, skipStart}
-			r.skipsWaiting++
-			flush = false
-		}
-		// if r.instanceSpace[r.crtInstance] == nil {
-		// fmt.Println("hello there")
-		r.instanceSpace[r.crtInstance] = &Instance{true,
-			int(skipEnd-r.crtInstance)/r.N + 1,
-			nil,
-			-1,
-			COMMITTED,
-			nil,
-		}
-		// }
 
-		r.recordInstanceMetadata(r.instanceSpace[r.crtInstance])
-		r.sync()
-
-		r.crtInstance = skipEnd + int32(r.N)
+		r.crtInstance += int32(r.N)
 	}
+	// 	skipStart = r.crtInstance
+	// 	skipEnd = accept.Instance/int32(r.N)*int32(r.N) + r.Id
+	// 	if skipEnd > accept.Instance {
+	// 		skipEnd -= int32(r.N)
+	// 	}
+	// 	if r.skipsWaiting < MAX_SKIPS_WAITING {
+	// 		//start a timer, waiting for a propose to arrive and fill this hole
+	// 		go r.timerHelper(&DelayedSkip{skipEnd})
+	// 		//r.delayedSkipChan <- &DelayedSkip{accept, skipStart}
+	// 		r.skipsWaiting++
+	// 		flush = false
+	// 	}
+	// 	// if r.instanceSpace[r.crtInstance] == nil {
+	// 	// fmt.Println("hello there")
+	// 	r.instanceSpace[r.crtInstance] = &Instance{true,
+	// 		int(skipEnd-r.crtInstance)/r.N + 1,
+	// 		nil,
+	// 		-1,
+	// 		COMMITTED,
+	// 		nil,
+	// 	}
+	// 	// }
+
+	// 	r.recordInstanceMetadata(r.instanceSpace[r.crtInstance])
+	// 	r.sync()
+
+	// 	r.crtInstance = skipEnd + int32(r.N)
+	// }
 	if inst == nil {
 		skip := false
 		if accept.Skip == TRUE {
@@ -622,20 +642,37 @@ func (r *Replica) handleAccept(accept *menciusoptproto.Accept) {
 			r.replyAccept(accept.LeaderId, &menciusoptproto.AcceptReply{accept.Instance, TRUE, inst.ballot, skipStart, skipEnd})
 		}
 	}
-	if skipStart >= 0 {
-		dlog.Printf("Skipping!!\n")
-		r.bcastSkip(skipStart, skipEnd, accept.LeaderId)
-		r.updateBlocking(skipStart)
-		if flush {
-			for _, w := range r.PeerWriters {
-				if w != nil {
-					w.Flush()
-				}
-			}
-		}
-	} else {
-		r.updateBlocking(accept.Instance)
-	}
+	// if skipStart >= 0 {
+	// 	dlog.Printf("Skipping!!\n")
+	// 	r.bcastSkip(skipStart, skipEnd, accept.LeaderId)
+	// 	r.updateBlocking(skipStart)
+	// 	if flush {
+	// 		for _, w := range r.PeerWriters {
+	// 			if w != nil {
+	// 				w.Flush()
+	// 			}
+	// 		}
+	// 	}
+	// } else {
+	r.updateBlocking(accept.Instance)
+	// }
+	// if r.takeOver > 0 {
+	// 	skipEnd = accept.Instance/int32(r.N)*int32(r.N) + r.Id + 1
+	// 	if skipEnd > accept.Instance {
+	// 		skipEnd -= int32(r.N)
+	// 	}
+	// 	r.bcastSkip(skipStart+1, skipEnd, accept.LeaderId)
+	// 	if r.instanceSpace[r.crtInstance+1] == nil {
+	// 		r.instanceSpace[r.crtInstance+1] = &Instance{true,
+	// 			int(skipEnd-r.crtInstance+1)/r.N + 1,
+	// 			nil,
+	// 			-1,
+	// 			COMMITTED,
+	// 			nil,
+	// 		}
+	// 	}
+
+	// }
 }
 
 func (r *Replica) handleDelayedSkip(delayedSkip *DelayedSkip) {
@@ -713,7 +750,9 @@ func (r *Replica) handlePrepareReply(preply *menciusoptproto.PrepareReply) {
 			if preply.Skip == TRUE {
 				inst.skipped = true
 			}
+
 			inst.nbInstSkipped = int(preply.NbInstancesToSkip)
+
 			inst.lb.maxRecvBallot = preply.Ballot
 		}
 
@@ -724,8 +763,11 @@ func (r *Replica) handlePrepareReply(preply *menciusoptproto.PrepareReply) {
 			if inst.skipped {
 				skip = TRUE
 			}
-			if preply.Instance%int32(r.N) != int32(r.Id) {
-				r.takeOver = preply.Instance % int32(r.N)
+			if inst.nbInstSkipped < 0 {
+				r.takeOver = int32(int(r.Id+1) % r.N)
+				// give it some
+				log.Println("successfully took over", r.takeOver, "at ", preply.Instance)
+				inst.nbInstSkipped = (int(r.crtInstance) - int(r.blockingInstance)) + 10000
 			}
 			r.bcastAccept(preply.Instance, inst.ballot, skip, int32(inst.nbInstSkipped), inst.commands)
 		}
@@ -765,6 +807,7 @@ func (r *Replica) handleAcceptReply(areply *menciusoptproto.AcceptReply) {
 
 		if inst.status == COMMITTED || inst.status == EXECUTED { //TODO || aargs.Ballot != inst.ballot {
 			// we've moved on, these are delayed replies, so just ignore
+
 			return
 		}
 
@@ -819,10 +862,9 @@ func (r *Replica) updateBlocking(instance int32) {
 		if inst.status == ACCEPTED && inst.skipped {
 			return
 		}
-		takeover := int32(-1)
-		// if r.takeOver > 0 {
-		// 	takeover = r.takeOver
-		// }
+
+		takeover := r.takeOver
+
 		if r.blockingInstance%int32(r.N) == r.Id || (takeover > 0 && r.blockingInstance%int32(r.N) == takeover) || inst.lb != nil {
 
 			if inst.status == READY {
@@ -917,6 +959,7 @@ func (r *Replica) executeCommands() {
 			}
 
 			if r.instanceSpace[i].skipped {
+				fmt.Println("skipped")
 				skippedTo[i%int32(r.N)] = i + int32(r.instanceSpace[i].nbInstSkipped*r.N)
 				if !jump {
 					skippedToOrig[i%int32(r.N)] = skippedTo[i%int32(r.N)]
@@ -934,7 +977,7 @@ func (r *Replica) executeCommands() {
 			}
 			for idx := 0; idx < len(inst.commands); idx++ {
 				inst.commands[idx].Execute(r.State)
-				if r.Dreply && inst.lb != nil && inst.lb.clientProposals[idx] != nil {
+				if r.Dreply && inst.lb != nil && len(inst.lb.clientProposals) > 0 && inst.lb.clientProposals[idx] != nil {
 					dlog.Printf("Sending ACK for req. %d\n", inst.lb.clientProposals[idx].CommandId)
 					r.ReplyProposeTS(&genericsmrproto.ProposeReplyTS{TRUE, inst.lb.clientProposals[idx].CommandId, state.NIL, inst.lb.clientProposals[idx].Timestamp},
 						inst.lb.clientProposals[idx].Reply)
@@ -960,10 +1003,16 @@ func (r *Replica) executeCommands() {
 func (r *Replica) forceCommit() {
 	//find what is the oldest un-initialized instance and try to take over
 	problemInstance := r.blockingInstance
-
+	if r.takeOver > 0 && int(problemInstance)%r.N == int(r.takeOver) {
+		r.broadAccpetFor(problemInstance, false)
+		log.Println("sending accepting instead of preparing for instance took over for instance", problemInstance)
+		return
+	}
 	//try to take over the problem instance
 	if int(problemInstance)%r.N == int(r.Id+1)%r.N {
-		log.Println("Replica", r.Id, "r.N=", r.N, "Trying to take over instance", problemInstance, "blocked at", r.blockingInstance)
+
+		log.Println("Replica", r.Id, "r.N=", r.N, "Trying to take over instance", problemInstance, "blocked at", r.blockingInstance, "takeover=", r.takeOver)
+
 		if r.instanceSpace[problemInstance] == nil {
 			r.instanceSpace[problemInstance] = &Instance{true,
 				NB_INST_TO_SKIP,
@@ -974,6 +1023,7 @@ func (r *Replica) forceCommit() {
 			r.instanceSpace[problemInstance].commands = append(r.instanceSpace[problemInstance].commands, state.Command{state.NONE, 0, 0})
 			r.bcastPrepare(problemInstance, r.instanceSpace[problemInstance].ballot)
 		} else {
+
 			log.Println("Not nil")
 			r.bcastPrepare(problemInstance, r.instanceSpace[problemInstance].ballot)
 		}

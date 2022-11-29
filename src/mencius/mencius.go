@@ -16,7 +16,7 @@ import (
 
 const CHAN_BUFFER_SIZE = 200000
 const WAIT_BEFORE_SKIP_MS = 5
-const NB_INST_TO_SKIP = 10
+const NB_INST_TO_SKIP = -100
 const MAX_SKIPS_WAITING = 2
 const TRUE = uint8(1)
 const FALSE = uint8(0)
@@ -48,6 +48,7 @@ type Replica struct {
 	skipsWaiting             int
 	counter                  int
 	skippedTo                []int32
+	takeOver                 int32
 }
 
 type DelayedSkip struct {
@@ -106,7 +107,9 @@ func NewReplica(id int, peerAddrList []string, thrifty bool, exec bool, dreply b
 		false,
 		0,
 		0,
-		skippedTo}
+		skippedTo,
+		-1,
+	}
 
 	r.Durable = durable
 
@@ -440,7 +443,15 @@ func (r *Replica) handlePropose(propose *genericsmr.Propose) {
 		r.makeBallotLargerThan(0),
 		ACCEPTED,
 		&LeaderBookkeeping{propose, 0, 0, 0, 0}}
-
+	if r.takeOver > 0 {
+		r.instanceSpace[instNo+1] = &Instance{true,
+			10,
+			nil,
+			-1,
+			COMMITTED,
+			nil}
+		r.updateBlocking(instNo + 1)
+	}
 	r.recordInstanceMetadata(r.instanceSpace[instNo])
 	r.recordCommand(&propose.Command)
 	r.sync()
@@ -590,6 +601,32 @@ func (r *Replica) handleAccept(accept *menciusproto.Accept) {
 	} else {
 		r.updateBlocking(accept.Instance)
 	}
+	if r.takeOver > 0 {
+		skipEnd = accept.Instance/int32(r.N)*int32(r.N) + r.Id + 1
+		if skipEnd > accept.Instance {
+			skipEnd -= int32(r.N)
+		}
+
+		if r.instanceSpace[r.crtInstance+1] == nil {
+			r.instanceSpace[r.crtInstance+1] = &Instance{true,
+				int(skipEnd-r.crtInstance+1)/r.N + 1,
+				nil,
+				-1,
+				COMMITTED,
+				nil,
+			}
+		}
+		r.bcastSkip(skipStart+1, skipEnd, accept.LeaderId)
+		r.updateBlocking(skipStart)
+		if flush {
+			for _, w := range r.PeerWriters {
+				if w != nil {
+					w.Flush()
+				}
+			}
+		}
+		r.replyAccept(accept.LeaderId, &menciusproto.AcceptReply{accept.Instance, FALSE, -1, skipStart + 1, skipEnd})
+	}
 }
 
 func (r *Replica) handleDelayedSkip(delayedSkip *DelayedSkip) {
@@ -674,6 +711,11 @@ func (r *Replica) handlePrepareReply(preply *menciusproto.PrepareReply) {
 			if inst.skipped {
 				skip = TRUE
 			}
+			if inst.nbInstSkipped < 0 {
+				r.takeOver = int32(int(r.Id+1) % r.N)
+				// give it some
+				inst.nbInstSkipped = -inst.nbInstSkipped
+			}
 			r.bcastAccept(preply.Instance, inst.ballot, skip, int32(inst.nbInstSkipped), *inst.command)
 		}
 	} else {
@@ -702,10 +744,10 @@ func (r *Replica) handleAcceptReply(areply *menciusproto.AcceptReply) {
 		if areply.SkippedStartInstance > -1 {
 			r.instanceSpace[areply.SkippedStartInstance] = &Instance{true,
 				int(areply.SkippedEndInstance-areply.SkippedStartInstance)/r.N + 1,
-				nil,
+				&state.Command{state.NONE, 0, 0},
 				0,
 				COMMITTED,
-				nil}
+				&LeaderBookkeeping{nil, 0, 0, 0, 0}}
 			r.updateBlocking(areply.SkippedStartInstance)
 		}
 
@@ -722,9 +764,29 @@ func (r *Replica) handleAcceptReply(areply *menciusproto.AcceptReply) {
 			if !inst.skipped && areply.Instance > r.latestInstReady {
 				r.latestInstReady = areply.Instance
 			}
+			if r.takeOver > 0 {
+				r.instanceSpace[areply.Instance+1] = &Instance{true,
+					10,
+					nil,
+					-1,
+					COMMITTED,
+					nil}
+			}
 			r.updateBlocking(areply.Instance)
 		}
 	} else {
+		// cheating here
+		if areply.SkippedStartInstance > -1 {
+			r.instanceSpace[areply.SkippedStartInstance] = &Instance{true,
+				int(areply.SkippedEndInstance-areply.SkippedStartInstance)/r.N + 1,
+				&state.Command{state.NONE, 0, 0},
+				0,
+				COMMITTED,
+				&LeaderBookkeeping{nil, 0, 0, 0, 0}}
+			r.updateBlocking(areply.SkippedStartInstance)
+			return
+		}
+
 		// TODO: there is probably another active leader
 		inst.lb.nacks++
 		if areply.Ballot > inst.lb.maxRecvBallot {
@@ -750,6 +812,14 @@ func (r *Replica) updateBlocking(instance int32) {
 	}
 
 	for r.blockingInstance = r.blockingInstance; true; r.blockingInstance++ {
+		if r.takeOver > 0 && r.blockingInstance%int32(r.N) == r.takeOver {
+			r.instanceSpace[r.blockingInstance] = &Instance{true,
+				10,
+				nil,
+				-1,
+				COMMITTED,
+				nil}
+		}
 		if r.blockingInstance <= r.skippedTo[int(r.blockingInstance)%r.N] {
 			continue
 		}
@@ -764,7 +834,8 @@ func (r *Replica) updateBlocking(instance int32) {
 		if inst.status == ACCEPTED && inst.skipped {
 			return
 		}
-		if r.blockingInstance%int32(r.N) == r.Id || inst.lb != nil {
+		takeover := r.takeOver
+		if r.blockingInstance%int32(r.N) == r.Id || (takeover > 0 && r.blockingInstance%int32(r.N) == takeover) || inst.lb != nil {
 			if inst.status == READY {
 				//commit my instance
 				dlog.Printf("Am about to commit instance %d\n", r.blockingInstance)
@@ -881,10 +952,21 @@ func (r *Replica) executeCommands() {
 func (r *Replica) forceCommit() {
 	//find what is the oldest un-initialized instance and try to take over
 	problemInstance := r.blockingInstance
-
+	if r.takeOver > 0 && int(problemInstance)%r.N == int(r.takeOver) {
+		r.instanceSpace[problemInstance] = &Instance{true,
+			10,
+			nil,
+			-1,
+			COMMITTED,
+			nil,
+		}
+		r.updateBlocking(problemInstance)
+		log.Println("skipping instead of preparing for instance took over for instance", problemInstance)
+		return
+	}
 	//try to take over the problem instance
 	if int(problemInstance)%r.N == int(r.Id+1)%r.N {
-		log.Println("Replica", r.Id, "r.N=", r.N, "Trying to take over instance", problemInstance)
+		log.Println("Replica", r.Id, "r.N=", r.N, "Trying to take over instance", problemInstance, "blocked at", r.blockingInstance, "takeover=", r.takeOver)
 		if r.instanceSpace[problemInstance] == nil {
 			r.instanceSpace[problemInstance] = &Instance{true,
 				NB_INST_TO_SKIP,

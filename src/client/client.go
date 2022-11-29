@@ -68,17 +68,17 @@ func clientWriter(idx int, writerList []*bufio.Writer, stop chan int, next chan 
 	for id := int32(0); ; id++ {
 		select {
 		case i := <-stop:
-			fmt.Println("stopping sender ", idx)
+			// fmt.Println("stopping sender ", idx)
 			writerList[i%N] = nil
 			stop := true
 			for _, writer := range writerList {
 				if writer != nil {
-					fmt.Println("stopping sender ", i)
+					// fmt.Println("stopping sender ", i)
 					stop = false
 				}
 			}
 			if stop {
-				fmt.Println("all connections are nil, stopping sender", idx)
+				// fmt.Println("all connections are nil, stopping sender", idx)
 				return
 			}
 		default:
@@ -113,13 +113,13 @@ func clientWriter(idx int, writerList []*bufio.Writer, stop chan int, next chan 
 			}
 			err := writerList[sid].WriteByte(genericsmrproto.PROPOSE)
 			if err != nil {
-				fmt.Println(sid, err)
+				// fmt.Println(sid, err)
 				writerList[sid] = nil
 			}
 			args.Marshal(writerList[sid])
 			err = writerList[sid].Flush()
 			if err != nil {
-				fmt.Println(sid, err)
+				// fmt.Println(sid, err)
 				writerList[sid] = nil
 			}
 			// fmt.Println(idx, id)
@@ -140,7 +140,7 @@ func clientWriter(idx int, writerList []*bufio.Writer, stop chan int, next chan 
 func clientReader(idx int, reader *bufio.Reader, stop chan int, next chan int, wg *sync.WaitGroup) {
 	defer wg.Done()
 	if reader == nil {
-		fmt.Println("stopping nil reader", idx)
+		// fmt.Println("stopping nil reader", idx)
 		return
 	}
 	var reply genericsmrproto.ProposeReplyTS
@@ -149,9 +149,9 @@ func clientReader(idx int, reader *bufio.Reader, stop chan int, next chan int, w
 	for {
 		select {
 		case <-ticker.C:
-			fmt.Println("stopping reader ", idx)
+			// fmt.Println("stopping reader ", idx)
 			stop <- idx
-			fmt.Println(idx, "sent out")
+			// fmt.Println(idx, "sent out")
 			return
 		default:
 			// fmt.Println("for new msg!")
@@ -247,6 +247,7 @@ func main() {
 	}
 	fmt.Println("testing started!")
 	wg.Wait()
+	fmt.Println("testing finished, dealing with datas!")
 	var total uint64
 	maxindex = -1
 	total = 0
@@ -256,6 +257,7 @@ func main() {
 	// latencies:= make(heap)
 	var ls []time.Duration
 	onesecondslides := make(map[int][]time.Duration)
+	alllatency := make([]time.Duration, 0)
 	index := 0
 	for idx, endtimes := range end {
 		for cid, etime := range endtimes {
@@ -276,15 +278,38 @@ func main() {
 				onesecondslides[index] = make([]time.Duration, 0)
 			}
 			onesecondslides[index] = append(onesecondslides[index], l)
+			alllatency = append(alllatency, l)
 		}
 	}
-	fmt.Printf("num of clients: %v\nx: %v \nnum of total commands: %v \navg latency: %v \n totalout: %v\n\n\n", *T, total/uint64(*t), total, sum/time.Duration(total), totalout)
+	alllatency = sortlatency(alllatency)
+	i95 := 95 * (len(alllatency) - 1) / 100
+	i99 := 99 * (len(alllatency) - 1) / 100
+	i50 := 50 * (len(alllatency) - 1) / 100
+	i999 := 999 * (len(alllatency) - 1) / 1000
+	imax := len(alllatency) - 1
+	x := total / uint64(*t)
+	avg := sum / time.Duration(total)
+	p95 := alllatency[i95]
+	p99 := alllatency[i99]
+	p50 := alllatency[i50]
+	p999 := alllatency[i999]
+	pmax := alllatency[imax]
+	pmin := alllatency[0]
+
+	fmt.Printf("num of clients: %v\nx: %v \nnum of total commands: %v \navg latency: %v \n totalout: %v, p95=%v, p99=%v\n\n\n", *T, x, total, avg, totalout, p95, p99)
 
 	fmt.Println("------------------------------------------------------")
-	fmt.Println("DETAILED RESULTS(second, throughput, average latency)")
+	fmt.Println("DETAILED RESULTS(second, latencies in ms, x)")
 	fmt.Println("------------------------------------------------------")
 	maxindex = getmaxindex(onesecondslides)
+	fmt.Println("sec, 50, 95, 99, 999, max, min, avg, x")
 	for i := 0; i <= maxindex; i++ {
+		onesecondslides[i] = sortlatency(onesecondslides[i])
+		i50 := 50 * (len(onesecondslides[i]) - 1) / 100
+		i95 := 95 * (len(onesecondslides[i]) - 1) / 100
+		i99 := 99 * (len(onesecondslides[i]) - 1) / 100
+		i999 := 999 * (len(onesecondslides[i]) - 1) / 1000
+		imax := len(onesecondslides[i]) - 1
 		items := onesecondslides[i]
 		var subsum time.Duration
 		var subtotal uint64
@@ -295,16 +320,58 @@ func main() {
 				subsum += item
 				subtotal += 1
 			}
-			fmt.Println(i, ",", subtotal, ",", subsum/time.Duration(subtotal))
+			sp50 := onesecondslides[i][i50]
+			sp95 := onesecondslides[i][i95]
+			sp99 := onesecondslides[i][i99]
+			sp999 := onesecondslides[i][i999]
+			spmax := onesecondslides[i][imax]
+			spmin := onesecondslides[i][0]
+			spavg := subsum / time.Duration(subtotal)
+			sx := subtotal
+			fmt.Printf("%v,%v,%v,%v,%v,%v,%v,%v,%v\n",
+				i,
+				float64(sp50.Nanoseconds())/1000000.0,
+				float64(sp95.Nanoseconds())/1000000.0,
+				float64(sp99.Nanoseconds())/1000000.0,
+				float64(sp999.Nanoseconds())/1000000.0,
+				float64(spmax.Nanoseconds())/1000000.0,
+				float64(spmin.Nanoseconds())/1000000.0,
+				float64(spavg.Nanoseconds())/1000000.0,
+				sx)
+			// fmt.Println(i, ",", subtotal, ",", subsum/time.Duration(subtotal), onesecondslides[i][i95], onesecondslides[i][i99])
 		} else {
 			fmt.Println(i, ",", "nil")
 		}
 	}
-	master.Close()
+
+	fmt.Println("Concurrency =", *T)
+	fmt.Println("Benchmark Time =", *t)
+	fmt.Println("overallx =", x)
+	fmt.Println("overallmax =", float64(pmax.Nanoseconds())/1000000.0)
+	fmt.Println("overallmin =", float64(pmin.Nanoseconds())/1000000.0)
+	fmt.Println("overall50 =", float64(p50.Nanoseconds())/1000000.0)
+	fmt.Println("overall95 =", float64(p95.Nanoseconds())/1000000.0)
+	fmt.Println("overall99 =", float64(p99.Nanoseconds())/1000000.0)
+	fmt.Println("overall999 =", float64(p999.Nanoseconds())/1000000.0)
+	fmt.Println("overallavg =", float64(avg.Nanoseconds())/1000000.0)
 	// 	for i := 0; i < *T; i++ {
 	// 		readers[i].Reset(nil)
 	// 		writers[i].Reset(nil)
 	// 	}
+	master.Close()
+}
+func sortlatency(inarray []time.Duration) []time.Duration {
+	len := len(inarray)
+	for i := 0; i < len-1; i++ {
+		for j := 0; j < len-i-1; j++ {
+			if inarray[j] > inarray[j+1] {
+				tmp := inarray[j]
+				inarray[j] = inarray[j+1]
+				inarray[j+1] = tmp
+			}
+		}
+	}
+	return inarray
 }
 
 func getmaxindex(m map[int][]time.Duration) int {
