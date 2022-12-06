@@ -48,7 +48,7 @@ type Replica struct {
 	skipsWaiting             int
 	counter                  int
 	skippedTo                []int32
-	takeOver                 int32
+	takeOver                 []int32
 	resetTicker              bool
 }
 
@@ -109,7 +109,7 @@ func NewReplica(id int, peerAddrList []string, thrifty bool, exec bool, dreply b
 		0,
 		0,
 		skippedTo,
-		-1,
+		nil,
 		false,
 	}
 
@@ -224,8 +224,11 @@ func (r *Replica) run() {
 				break
 			}
 			r.broadAccpetFor(r.crtInstance, false)
-			if r.takeOver > 0 {
-				takeoverid := r.takeOver - r.Id + r.crtInstance
+			for _, id := range r.takeOver {
+				if id < 0 {
+					continue
+				}
+				takeoverid := int32(id) - r.Id + r.crtInstance
 				r.broadAccpetFor(takeoverid, false)
 			}
 
@@ -450,8 +453,6 @@ func (r *Replica) bcastCommit(instance int32, skip uint8, nbInstToSkip int32, co
 	mc.Instance = instance
 	mc.Skip = skip
 	mc.NbInstancesToSkip = nbInstToSkip
-	//mc.Command = command
-	//args := &menciusoptproto.Commit{r.Id, instance, skip, nbInstToSkip, command}
 	args := &mc
 
 	n := r.N - 1
@@ -554,8 +555,9 @@ func (r *Replica) timerHelper(ds *DelayedSkip) {
 	r.delayedSkipChan <- ds
 }
 
+var count int
+
 func (r *Replica) handleAccept(accept *menciusoptproto.Accept) {
-	// flush := true
 	inst := r.instanceSpace[accept.Instance]
 
 	if inst != nil && inst.ballot > accept.Ballot {
@@ -565,43 +567,21 @@ func (r *Replica) handleAccept(accept *menciusoptproto.Accept) {
 
 	skipStart := int32(-1)
 	skipEnd := int32(-1)
+
+	// response with whatever we have for this round, to reduce the waiting period.
 	if accept.Skip == FALSE && r.crtInstance < accept.Instance {
 		r.broadAccpetFor(r.crtInstance, false)
-		if r.takeOver > 0 {
-			takeoverid := r.takeOver - r.Id + r.crtInstance
+		for _, id := range r.takeOver {
+			if id < 0 {
+				continue
+			}
+			takeoverid := int32(id) - r.Id + r.crtInstance
 			r.broadAccpetFor(takeoverid, false)
 		}
 
+		r.resetTicker = true
 		r.crtInstance += int32(r.N)
 	}
-	// 	skipStart = r.crtInstance
-	// 	skipEnd = accept.Instance/int32(r.N)*int32(r.N) + r.Id
-	// 	if skipEnd > accept.Instance {
-	// 		skipEnd -= int32(r.N)
-	// 	}
-	// 	if r.skipsWaiting < MAX_SKIPS_WAITING {
-	// 		//start a timer, waiting for a propose to arrive and fill this hole
-	// 		go r.timerHelper(&DelayedSkip{skipEnd})
-	// 		//r.delayedSkipChan <- &DelayedSkip{accept, skipStart}
-	// 		r.skipsWaiting++
-	// 		flush = false
-	// 	}
-	// 	// if r.instanceSpace[r.crtInstance] == nil {
-	// 	// fmt.Println("hello there")
-	// 	r.instanceSpace[r.crtInstance] = &Instance{true,
-	// 		int(skipEnd-r.crtInstance)/r.N + 1,
-	// 		nil,
-	// 		-1,
-	// 		COMMITTED,
-	// 		nil,
-	// 	}
-	// 	// }
-
-	// 	r.recordInstanceMetadata(r.instanceSpace[r.crtInstance])
-	// 	r.sync()
-
-	// 	r.crtInstance = skipEnd + int32(r.N)
-	// }
 	if inst == nil {
 		skip := false
 		if accept.Skip == TRUE {
@@ -642,37 +622,7 @@ func (r *Replica) handleAccept(accept *menciusoptproto.Accept) {
 			r.replyAccept(accept.LeaderId, &menciusoptproto.AcceptReply{accept.Instance, TRUE, inst.ballot, skipStart, skipEnd})
 		}
 	}
-	// if skipStart >= 0 {
-	// 	dlog.Printf("Skipping!!\n")
-	// 	r.bcastSkip(skipStart, skipEnd, accept.LeaderId)
-	// 	r.updateBlocking(skipStart)
-	// 	if flush {
-	// 		for _, w := range r.PeerWriters {
-	// 			if w != nil {
-	// 				w.Flush()
-	// 			}
-	// 		}
-	// 	}
-	// } else {
 	r.updateBlocking(accept.Instance)
-	// }
-	// if r.takeOver > 0 {
-	// 	skipEnd = accept.Instance/int32(r.N)*int32(r.N) + r.Id + 1
-	// 	if skipEnd > accept.Instance {
-	// 		skipEnd -= int32(r.N)
-	// 	}
-	// 	r.bcastSkip(skipStart+1, skipEnd, accept.LeaderId)
-	// 	if r.instanceSpace[r.crtInstance+1] == nil {
-	// 		r.instanceSpace[r.crtInstance+1] = &Instance{true,
-	// 			int(skipEnd-r.crtInstance+1)/r.N + 1,
-	// 			nil,
-	// 			-1,
-	// 			COMMITTED,
-	// 			nil,
-	// 		}
-	// 	}
-
-	// }
 }
 
 func (r *Replica) handleDelayedSkip(delayedSkip *DelayedSkip) {
@@ -763,12 +713,30 @@ func (r *Replica) handlePrepareReply(preply *menciusoptproto.PrepareReply) {
 			if inst.skipped {
 				skip = TRUE
 			}
-			if inst.nbInstSkipped < 0 {
-				r.takeOver = int32(int(r.Id+1) % r.N)
-				// give it some
-				log.Println("successfully took over", r.takeOver, "at ", preply.Instance)
-				inst.nbInstSkipped = (int(r.crtInstance) - int(r.blockingInstance)) + 10000
+			if inst.nbInstSkipped != 0 {
+				for idx := preply.Instance; idx <= r.crtInstance+int32(r.N); idx += int32(r.N) {
+					if r.instanceSpace[idx] != nil {
+						if r.instanceSpace[idx].commands != nil {
+							if len(r.instanceSpace[idx].commands) > 0 {
+								if r.instanceSpace[idx].commands[0].Op == state.NONE && len(r.instanceSpace[idx].commands) == 1 {
+									continue
+								}
+								fmt.Println("notnil notnon", r.instanceSpace[idx])
+								inst.nbInstSkipped = int(idx - preply.Instance)
+								r.bcastAccept(preply.Instance, inst.ballot, skip, int32(inst.nbInstSkipped), inst.commands)
+								return
+							}
+						}
+					}
+				}
+				if inst.nbInstSkipped < 0 {
+					r.takeOver = append(r.takeOver, preply.Instance%int32(r.N))
+					// give it some
+					log.Println("successfully took over", preply.Instance%int32(r.N), "at ", preply.Instance)
+					inst.nbInstSkipped = (int(r.crtInstance) + r.N - int(preply.Instance))
+				}
 			}
+
 			r.bcastAccept(preply.Instance, inst.ballot, skip, int32(inst.nbInstSkipped), inst.commands)
 		}
 	} else {
@@ -862,10 +830,19 @@ func (r *Replica) updateBlocking(instance int32) {
 		if inst.status == ACCEPTED && inst.skipped {
 			return
 		}
+		yes := false
 
-		takeover := r.takeOver
+		for _, takeover := range r.takeOver {
+			if takeover < 0 {
+				continue
+			}
+			if r.blockingInstance%int32(r.N) == int32(takeover) {
+				yes = true
+				break
+			}
+		}
 
-		if r.blockingInstance%int32(r.N) == r.Id || (takeover > 0 && r.blockingInstance%int32(r.N) == takeover) || inst.lb != nil {
+		if r.blockingInstance%int32(r.N) == r.Id || yes || inst.lb != nil {
 
 			if inst.status == READY {
 				//commit my instance
@@ -959,7 +936,7 @@ func (r *Replica) executeCommands() {
 			}
 
 			if r.instanceSpace[i].skipped {
-				fmt.Println("skipped")
+				// fmt.Println("skipped")
 				skippedTo[i%int32(r.N)] = i + int32(r.instanceSpace[i].nbInstSkipped*r.N)
 				if !jump {
 					skippedToOrig[i%int32(r.N)] = skippedTo[i%int32(r.N)]
@@ -1003,7 +980,15 @@ func (r *Replica) executeCommands() {
 func (r *Replica) forceCommit() {
 	//find what is the oldest un-initialized instance and try to take over
 	problemInstance := r.blockingInstance
-	if r.takeOver > 0 && int(problemInstance)%r.N == int(r.takeOver) {
+	yes := false
+
+	for _, i := range r.takeOver {
+		if i >= 0 && int(problemInstance)%r.N == int(i) {
+			yes = true
+		}
+	}
+
+	if yes {
 		r.broadAccpetFor(problemInstance, false)
 		log.Println("sending accepting instead of preparing for instance took over for instance", problemInstance)
 		return
