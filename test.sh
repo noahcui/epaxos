@@ -1,15 +1,25 @@
-for ((i=8;i<=80;i+=8))
+#!/usr/bin/env bash
+rm -rf testresult
+for ((i=4;i<=80;i+=4))
 do
-./driver.sh -d testresult -t 5 -g batching -c $i -a mo
-
-sleep 120
+	echo "mo $i"
+	sleep 5
+	./AWSreboot.sh
+	sleep 30
+	./driver.sh -d testresult -t 60 -g batching -c $i -a mo
+	
+	echo "mo $i finish"
 done
 
 sleep 240
 
-for ((i=8;i<=64;i+=8))
+for ((i=4;i<=80;i+=4))
 do
-./driver.sh -d testresult -t 5 -g nobatching -c $i -a m
-
-sleep 120
+	echo "m $i"
+	sleep 5
+	./AWSreboot.sh
+	sleep 30
+	./driver.sh -d testresult -t 60 -g nobatching -c $i -a m
+	echo "m $i finish"
 done
+

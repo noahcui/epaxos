@@ -61,12 +61,12 @@ bin/client -e -t $TIME -T $CLIENTS -think 1 > $DIR/$GROUP/$CLIENTS-$TIME &
 
 if((KILL>0)); then
 sleep $KILL
-ssh server1 "cd epaxos; ./stop.sh server.pid" &
+ssh server1 "cd epaxos; ./stop.sh server.pid;" &
 fi
 
 # sleep $TIME
 sleep $TIME
 sleep 5
-ssh server1 "cd epaxos; ./stop.sh server.pid" &
-ssh server2 "cd epaxos; ./stop.sh server.pid" &
-ssh server3 "cd epaxos; ./stop.sh server.pid" &
+ssh server1 "cd epaxos; ./stop.sh server.pid;" &
+ssh server2 "cd epaxos; ./stop.sh server.pid;" &
+ssh server3 "cd epaxos; ./stop.sh server.pid;" &
