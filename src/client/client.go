@@ -337,7 +337,8 @@ func main() {
 	master.Close()
 }
 func sortlatency(inarray []time.Duration) []time.Duration {
-	sort.Ints(inarray)
+	// sort.Ints(inarray)
+	sort.Slice(inarray, func(i, j int) bool { return inarray[i] < inarray[j] })
 	// len := len(inarray)
 	// for i := 0; i < len-1; i++ {
 	// 	for j := 0; j < len-i-1; j++ {
