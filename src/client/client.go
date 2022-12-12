@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/rpc"
 	"runtime"
+	"sort"
 	"state"
 	"sync"
 	"time"
@@ -336,16 +337,17 @@ func main() {
 	master.Close()
 }
 func sortlatency(inarray []time.Duration) []time.Duration {
-	len := len(inarray)
-	for i := 0; i < len-1; i++ {
-		for j := 0; j < len-i-1; j++ {
-			if inarray[j] > inarray[j+1] {
-				tmp := inarray[j]
-				inarray[j] = inarray[j+1]
-				inarray[j+1] = tmp
-			}
-		}
-	}
+	sort.Ints(inarray)
+	// len := len(inarray)
+	// for i := 0; i < len-1; i++ {
+	// 	for j := 0; j < len-i-1; j++ {
+	// 		if inarray[j] > inarray[j+1] {
+	// 			tmp := inarray[j]
+	// 			inarray[j] = inarray[j+1]
+	// 			inarray[j+1] = tmp
+	// 		}
+	// 	}
+	// }
 	return inarray
 }
 
