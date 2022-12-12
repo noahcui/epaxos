@@ -268,7 +268,7 @@ func main() {
 			}
 
 			if print {
-				line := fmt.Sprintln(stime, etime)
+				line := fmt.Sprintln(stime.UnixNano(), etime.UnixNano())
 				fmt.Fprintln(w, line)
 			}
 
