@@ -268,7 +268,7 @@ func main() {
 			}
 
 			if print {
-				line := fmt.Sprintln(starttime, etime)
+				line := fmt.Sprintln(stime, etime)
 				fmt.Fprintln(w, line)
 			}
 
