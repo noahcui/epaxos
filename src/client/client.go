@@ -223,6 +223,7 @@ func main() {
 	fmt.Println("testing started!")
 	wg.Wait()
 	fmt.Println("testing finished, dealing with datas!")
+	time_now := time.Now()
 	var total uint64
 	maxindex = -1
 	total = 0
@@ -256,7 +257,8 @@ func main() {
 			alllatency = append(alllatency, l)
 		}
 	}
-	fmt.Println("start sorting data!")
+
+	fmt.Println("after", time.Now().Sub(time_now), "start sorting data!")
 	alllatency = sortlatency(alllatency)
 	i95 := 95 * (len(alllatency) - 1) / 100
 	i99 := 99 * (len(alllatency) - 1) / 100
