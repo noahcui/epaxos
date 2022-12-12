@@ -257,8 +257,8 @@ func main() {
 			alllatency = append(alllatency, l)
 		}
 	}
-
-	fmt.Println("after", time.Now().Sub(time_now), "start sorting data!")
+	now2 := time.Now()
+	fmt.Println("after", now2.Sub(time_now), "start sorting data!")
 	alllatency = sortlatency(alllatency)
 	i95 := 95 * (len(alllatency) - 1) / 100
 	i99 := 99 * (len(alllatency) - 1) / 100
@@ -273,6 +273,8 @@ func main() {
 	p999 := alllatency[i999]
 	pmax := alllatency[imax]
 	pmin := alllatency[0]
+	now3 := time.Now()
+	fmt.Println("after", now3.Sub(now2), "overall sorting finished")
 
 	fmt.Printf("num of clients: %v\nx: %v \nnum of total commands: %v \navg latency: %v \n totalout: %v, p95=%v, p99=%v\n\n\n", *T, x, total, avg, totalout, p95, p99)
 
