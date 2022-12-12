@@ -58,7 +58,6 @@ var start []map[int32]time.Time
 var end []map[int32]time.Time
 
 func clientWriter(idx int, writerList []*bufio.Writer, stop chan int, next chan int, wg *sync.WaitGroup) {
-	// defer wg.Done()
 	if writerList == nil {
 		fmt.Println("stopping nil sender groups ", idx)
 		return
@@ -68,17 +67,14 @@ func clientWriter(idx int, writerList []*bufio.Writer, stop chan int, next chan 
 	for id := int32(0); ; id++ {
 		select {
 		case i := <-stop:
-			// fmt.Println("stopping sender ", idx)
 			writerList[i%N] = nil
 			stop := true
 			for _, writer := range writerList {
 				if writer != nil {
-					// fmt.Println("stopping sender ", i)
 					stop = false
 				}
 			}
 			if stop {
-				// fmt.Println("all connections are nil, stopping sender", idx)
 				return
 			}
 		default:
@@ -90,7 +86,6 @@ func clientWriter(idx int, writerList []*bufio.Writer, stop chan int, next chan 
 				sid = rand.Int() % N
 				writer = writerList[sid]
 				if writer != nil {
-					// fmt.Printf("redirecting msg from %v to a new server, %v, %v\n", sid, writerList, writer)
 					break
 				}
 			}
@@ -104,7 +99,6 @@ func clientWriter(idx int, writerList []*bufio.Writer, stop chan int, next chan 
 			}
 			now := time.Now()
 			args.Timestamp = now.UnixNano()
-			// fmt.Println(now, time.Unix(0, args.Timestamp))
 			// Determine operation type
 			if *writes > rand.Intn(100) {
 				args.Command.Op = state.PUT // write operation
@@ -113,26 +107,17 @@ func clientWriter(idx int, writerList []*bufio.Writer, stop chan int, next chan 
 			}
 			err := writerList[sid].WriteByte(genericsmrproto.PROPOSE)
 			if err != nil {
-				// fmt.Println(sid, err)
 				writerList[sid] = nil
 			}
 			args.Marshal(writerList[sid])
 			err = writerList[sid].Flush()
 			if err != nil {
-				// fmt.Println(sid, err)
 				writerList[sid] = nil
 			}
-			// fmt.Println(idx, id)
 			mu.Lock()
-			// start[idx][id] = time.Now()
 			totalout += 1
 			mu.Unlock()
 			time.Sleep(time.Nanosecond * time.Duration(*thinktime*1000*1000))
-			// break
-			// }
-
-			// out := outInfo{startTimes: time.Now()}
-
 		}
 	}
 }
@@ -140,25 +125,18 @@ func clientWriter(idx int, writerList []*bufio.Writer, stop chan int, next chan 
 func clientReader(idx int, reader *bufio.Reader, stop chan int, next chan int, wg *sync.WaitGroup) {
 	defer wg.Done()
 	if reader == nil {
-		// fmt.Println("stopping nil reader", idx)
 		return
 	}
 	var reply genericsmrproto.ProposeReplyTS
 	ticker := time.NewTicker(time.Second * time.Duration(*t))
-	// next <- 0
 	for {
 		select {
 		case <-ticker.C:
-			// fmt.Println("stopping reader ", idx)
 			stop <- idx
-			// fmt.Println(idx, "sent out")
 			return
 		default:
-			// fmt.Println("for new msg!")
-
 			if err := reply.Unmarshal(reader); err != nil {
 				log.Println("Error when reading:", err)
-				// next <- 0
 				stop <- idx
 				return
 			}
@@ -169,10 +147,8 @@ func clientReader(idx int, reader *bufio.Reader, stop chan int, next chan int, w
 				if _, notempty := end[idx/N][reply.CommandId]; !notempty {
 					end[idx][reply.CommandId] = time.Now()
 					start[idx][reply.CommandId] = time.Unix(0, reply.Timestamp)
-					// next <- 0
 				}
 				mu.Unlock()
-				// fmt.Println(1 / 2)
 			}
 		}
 	}
@@ -181,7 +157,6 @@ func clientReader(idx int, reader *bufio.Reader, stop chan int, next chan int, w
 
 var maxindex int
 
-// func makeConnections()
 func main() {
 	flag.Parse()
 
@@ -281,6 +256,7 @@ func main() {
 			alllatency = append(alllatency, l)
 		}
 	}
+	fmt.Println("start sorting data!")
 	alllatency = sortlatency(alllatency)
 	i95 := 95 * (len(alllatency) - 1) / 100
 	i99 := 99 * (len(alllatency) - 1) / 100
@@ -338,7 +314,6 @@ func main() {
 				float64(spmin.Nanoseconds())/1000000.0,
 				float64(spavg.Nanoseconds())/1000000.0,
 				sx)
-			// fmt.Println(i, ",", subtotal, ",", subsum/time.Duration(subtotal), onesecondslides[i][i95], onesecondslides[i][i99])
 		} else {
 			fmt.Println(i, ",", "nil")
 		}
@@ -354,10 +329,6 @@ func main() {
 	fmt.Println("overall99 =", float64(p99.Nanoseconds())/1000000.0)
 	fmt.Println("overall999 =", float64(p999.Nanoseconds())/1000000.0)
 	fmt.Println("overallavg =", float64(avg.Nanoseconds())/1000000.0)
-	// 	for i := 0; i < *T; i++ {
-	// 		readers[i].Reset(nil)
-	// 		writers[i].Reset(nil)
-	// 	}
 	master.Close()
 }
 func sortlatency(inarray []time.Duration) []time.Duration {
