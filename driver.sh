@@ -64,8 +64,9 @@ sleep $KILL
 ssh server1 "cd epaxos; ./stop.sh"
 fi
 
+# sleep $TIME
 sleep $TIME
-sleep $TIME
+sleep 5
 ssh server1 "cd epaxos; ./stop.sh"
 ssh server2 "cd epaxos; ./stop.sh"
 ssh server3 "cd epaxos; ./stop.sh"
