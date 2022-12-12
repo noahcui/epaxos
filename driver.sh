@@ -41,6 +41,7 @@ done
 
 mkdir $DIR/
 mkdir $DIR/$GROUP/
+mkdir $DIR/$GROUP/raw_data
 
 export GOPATH=/Users/noahcui/Desktop/UNH/22fall/Research/epaxos
 
@@ -57,7 +58,7 @@ ssh server3 "cd epaxos; ./start.sh $master $server3 $ALG server.pid" &
 # echo $! >> ${PID_FILE2}
 # give it some time to settle down
 sleep 5 
-bin/client -e -t $TIME -T $CLIENTS -think 1 > $DIR/$GROUP/$CLIENTS-$TIME &
+bin/client -e -t $TIME -T $CLIENTS -think 1 -path $DIR/$GROUP/raw_data/$CLIENTS-$TIME> $DIR/$GROUP/$CLIENTS-$TIME &
 
 if((KILL>0)); then
 sleep $KILL

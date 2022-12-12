@@ -10,6 +10,7 @@ import (
 	"math/rand"
 	"net"
 	"net/rpc"
+	"os"
 	"runtime"
 	"sort"
 	"state"
@@ -31,6 +32,7 @@ var check = flag.Bool("check", false, "Check that every expected reply was recei
 var eps *int = flag.Int("eps", 0, "Send eps more messages per round than the client will wait for (to discount stragglers). Defaults to 0.")
 var conflicts *int = flag.Int("c", -1, "Percentage of conflicts. Defaults to 0%")
 var t *int = flag.Int("t", 5, "time in seconds for each round")
+var path *string = flag.String("path", "raw_data", "path to store raw data")
 var T = flag.Int("T", 10, "Number of threads (simulated clients).")
 var s = flag.Float64("s", 2, "Zipfian s parameter")
 var v = flag.Float64("v", 1, "Zipfian v parameter")
@@ -224,6 +226,16 @@ func main() {
 	fmt.Println("testing started!")
 	wg.Wait()
 	fmt.Println("testing finished, dealing with datas!")
+	print := true
+	file, err := os.Create(*path)
+	if err != nil {
+		fmt.Println(err)
+		print = false
+	}
+	defer file.Close()
+
+	w := bufio.NewWriter(file)
+
 	time_now := time.Now()
 	var total uint64
 	maxindex = -1
@@ -254,13 +266,24 @@ func main() {
 			if onesecondslides[index] == nil {
 				onesecondslides[index] = make([]time.Duration, 0)
 			}
+
+			if print {
+				line := fmt.Sprintln(starttime, etime)
+				fmt.Fprintln(w, line)
+			}
+
 			onesecondslides[index] = append(onesecondslides[index], l)
 			alllatency = append(alllatency, l)
 		}
 	}
+	if print {
+		w.Flush()
+	}
+
 	now2 := time.Now()
 	fmt.Println("after", now2.Sub(time_now), "start sorting data!")
 	alllatency = sortlatency(alllatency)
+	i90 := 90 * (len(alllatency) - 1) / 100
 	i95 := 95 * (len(alllatency) - 1) / 100
 	i99 := 99 * (len(alllatency) - 1) / 100
 	i50 := 50 * (len(alllatency) - 1) / 100
@@ -268,6 +291,7 @@ func main() {
 	imax := len(alllatency) - 1
 	x := total / uint64(*t)
 	avg := sum / time.Duration(total)
+	p90 := alllatency[i90]
 	p95 := alllatency[i95]
 	p99 := alllatency[i99]
 	p50 := alllatency[i50]
@@ -277,7 +301,7 @@ func main() {
 	now3 := time.Now()
 	fmt.Println("after", now3.Sub(now2), "overall sorting finished")
 
-	fmt.Printf("num of clients: %v\nx: %v \nnum of total commands: %v \navg latency: %v \n totalout: %v, p95=%v, p99=%v\n\n\n", *T, x, total, avg, totalout, p95, p99)
+	fmt.Printf("num of clients: %v\nx: %v \nnum of total commands: %v \navg latency: %v \n totalout: %v, p90=%v, p95=%v, p99=%v\n\n\n", *T, x, total, avg, totalout, p95, p99)
 
 	fmt.Println("------------------------------------------------------")
 	fmt.Println("DETAILED RESULTS(second, latencies in ms, x)")
@@ -287,6 +311,7 @@ func main() {
 	for i := 0; i <= maxindex; i++ {
 		onesecondslides[i] = sortlatency(onesecondslides[i])
 		i50 := 50 * (len(onesecondslides[i]) - 1) / 100
+		i90 := 95 * (len(onesecondslides[i]) - 1) / 100
 		i95 := 95 * (len(onesecondslides[i]) - 1) / 100
 		i99 := 99 * (len(onesecondslides[i]) - 1) / 100
 		i999 := 999 * (len(onesecondslides[i]) - 1) / 1000
@@ -302,6 +327,7 @@ func main() {
 				subtotal += 1
 			}
 			sp50 := onesecondslides[i][i50]
+			sp90 := onesecondslides[i][i90]
 			sp95 := onesecondslides[i][i95]
 			sp99 := onesecondslides[i][i99]
 			sp999 := onesecondslides[i][i999]
@@ -312,6 +338,7 @@ func main() {
 			fmt.Printf("%v,%v,%v,%v,%v,%v,%v,%v,%v\n",
 				i,
 				float64(sp50.Nanoseconds())/1000000.0,
+				float64(sp90.Nanoseconds())/1000000.0,
 				float64(sp95.Nanoseconds())/1000000.0,
 				float64(sp99.Nanoseconds())/1000000.0,
 				float64(sp999.Nanoseconds())/1000000.0,
@@ -330,12 +357,15 @@ func main() {
 	fmt.Println("overallmax =", float64(pmax.Nanoseconds())/1000000.0)
 	fmt.Println("overallmin =", float64(pmin.Nanoseconds())/1000000.0)
 	fmt.Println("overall50 =", float64(p50.Nanoseconds())/1000000.0)
+	fmt.Println("overall90 =", float64(p90.Nanoseconds())/1000000.0)
 	fmt.Println("overall95 =", float64(p95.Nanoseconds())/1000000.0)
 	fmt.Println("overall99 =", float64(p99.Nanoseconds())/1000000.0)
 	fmt.Println("overall999 =", float64(p999.Nanoseconds())/1000000.0)
 	fmt.Println("overallavg =", float64(avg.Nanoseconds())/1000000.0)
 	master.Close()
+
 }
+
 func sortlatency(inarray []time.Duration) []time.Duration {
 	// sort.Ints(inarray)
 	sort.Slice(inarray, func(i, j int) bool { return inarray[i] < inarray[j] })
