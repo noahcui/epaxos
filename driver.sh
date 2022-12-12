@@ -67,6 +67,6 @@ fi
 # sleep $TIME
 sleep $TIME
 sleep 5
-ssh server1 "cd epaxos; ./stop.sh server.pid"
-ssh server2 "cd epaxos; ./stop.sh server.pid"
-ssh server3 "cd epaxos; ./stop.sh server.pid"
+ssh server1 "cd epaxos; ./stop.sh server.pid" &
+ssh server2 "cd epaxos; ./stop.sh server.pid" &
+ssh server3 "cd epaxos; ./stop.sh server.pid" &
