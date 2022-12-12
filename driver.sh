@@ -46,9 +46,9 @@ export GOPATH=/Users/noahcui/Desktop/UNH/22fall/Research/epaxos
 
 bin/master &
 sleep 1
-ssh server1 "cd epaxos; ./start.sh $master $server1 $ALG"
-ssh server2 "cd epaxos; ./start.sh $master $server2 $ALG"
-ssh server3 "cd epaxos; ./start.sh $master $server3 $ALG"
+ssh server1 "cd epaxos; ./start.sh $master $server1 $ALG server.pid"
+ssh server2 "cd epaxos; ./start.sh $master $server2 $ALG server.pid"
+ssh server3 "cd epaxos; ./start.sh $master $server3 $ALG server.pid"
 # bin/server -port 7070 -exec -dreply -$ALG &
 # echo $! >> ${PID_FILE0}
 # bin/server -port 7071 -exec -dreply -$ALG &
@@ -61,12 +61,12 @@ bin/client -e -t $TIME -T $CLIENTS -think 1 > $DIR/$GROUP/$CLIENTS-$TIME &
 
 if((KILL>0)); then
 sleep $KILL
-ssh server1 "cd epaxos; ./stop.sh"
+ssh server1 "cd epaxos; ./stop.sh server.pid"
 fi
 
 # sleep $TIME
 sleep $TIME
 sleep 5
-ssh server1 "cd epaxos; ./stop.sh"
-ssh server2 "cd epaxos; ./stop.sh"
-ssh server3 "cd epaxos; ./stop.sh"
+ssh server1 "cd epaxos; ./stop.sh server.pid"
+ssh server2 "cd epaxos; ./stop.sh server.pid"
+ssh server3 "cd epaxos; ./stop.sh server.pid"
