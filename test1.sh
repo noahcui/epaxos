@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 for ((i=100;i<=128;i+=4))
 do
 	echo "mo $i"
