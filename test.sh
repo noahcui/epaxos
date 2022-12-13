@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-rm -rf testresult
+#rm -rf testresult
 for ((i=4;i<=128;i+=4))
 do
 	echo "mo $i"
