@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-for ((i=100;i<=128;i+=4))
+for ((i=132;i<=156;i+=4))
 do
 	echo "mo $i"
 	sleep 5

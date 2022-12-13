@@ -335,7 +335,7 @@ func main() {
 			spmin := onesecondslides[i][0]
 			spavg := subsum / time.Duration(subtotal)
 			sx := subtotal
-			fmt.Printf("%v,%v,%v,%v,%v,%v,%v,%v,%v\n",
+			fmt.Printf("%v,%v,%v,%v,%v,%v,%v,%v,%v,%v\n",
 				i,
 				float64(sp50.Nanoseconds())/1000000.0,
 				float64(sp90.Nanoseconds())/1000000.0,
