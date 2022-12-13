@@ -301,7 +301,7 @@ func main() {
 	now3 := time.Now()
 	fmt.Println("after", now3.Sub(now2), "overall sorting finished")
 
-	fmt.Printf("num of clients: %v\nx: %v \nnum of total commands: %v \navg latency: %v \n totalout: %v, p90=%v, p95=%v, p99=%v\n\n\n", *T, x, total, avg, totalout, p95, p99)
+	fmt.Printf("num of clients: %v\nx: %v \nnum of total commands: %v \navg latency: %v \n totalout: %v, p90=%v, p95=%v, p99=%v\n\n\n", *T, x, total, avg, totalout, p90, p95, p99)
 
 	fmt.Println("------------------------------------------------------")
 	fmt.Println("DETAILED RESULTS(second, latencies in ms, x)")
