@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #rm -rf testresult
-for ((i=4;i<=128;i+=4))
+for ((i=1;i<=160;i+=2))
 do
 	echo "mo $i"
 	sleep 5
@@ -13,7 +13,7 @@ done
 
 sleep 240
 
-for ((i=4;i<=80;i+=4))
+for ((i=1;i<=80;i+=1))
 do
 	echo "m $i"
 	sleep 5
