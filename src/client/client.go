@@ -307,7 +307,7 @@ func main() {
 	fmt.Println("DETAILED RESULTS(second, latencies in ms, x)")
 	fmt.Println("------------------------------------------------------")
 	maxindex = getmaxindex(onesecondslides)
-	fmt.Println("sec, 50, 95, 99, 999, max, min, avg, x")
+	fmt.Println("sec, 50, 90, 95, 99, 999, max, min, avg, x")
 	for i := 0; i <= maxindex; i++ {
 		onesecondslides[i] = sortlatency(onesecondslides[i])
 		i50 := 50 * (len(onesecondslides[i]) - 1) / 100
