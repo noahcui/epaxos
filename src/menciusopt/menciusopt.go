@@ -212,7 +212,7 @@ func (r *Replica) run() {
 		fmt.Println("makesure changes applied, hello")
 		go r.executeCommands()
 	}
-	bTicker := time.NewTicker(time.Millisecond * 1)
+	bTicker := time.NewTicker(time.Millisecond * 2)
 	go r.clock()
 
 	for !r.Shutdown {
