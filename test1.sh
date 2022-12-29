@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-for ((i=132;i<=156;i+=4))
+#rm -rf testresult
+for ((i=5;i<=200;i+=5))
 do
 	echo "mo $i"
 	sleep 5
 	./AWSreboot.sh
 	sleep 30
-	./driver.sh -d testresult -t 60 -g batching -c $i -a mo
+	./driver.sh -d testresult -t 60 -g 3batching$1ms -c $i -a mo -s 3
 	
 	echo "mo $i finish"
 done
