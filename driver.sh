@@ -83,7 +83,7 @@ fi
 mkdir $DIR/$GROUP/raw_data/useage/$CLIENTS-$TIME
 # sleep $TIME
 sleep $TIME
-sleep 40
+sleep 15
 for ((i=1;i<=$S;i++))
 do
     scp server$i:epaxos/server$i.csv $DIR/$GROUP/raw_data/useage/$CLIENTS-$TIME/
