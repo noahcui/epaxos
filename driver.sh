@@ -73,7 +73,7 @@ done
 # bin/server -port 7072 -exec -dreply -$ALG &
 # echo $! >> ${PID_FILE2}
 # give it some time to settle down
-sleep 5 
+sleep 5
 bin/client -e -t $TIME -T $CLIENTS -think 1 -path $DIR/$GROUP/raw_data/$CLIENTS-$TIME > $DIR/$GROUP/$CLIENTS-$TIME &
 
 if((KILL>0)); then
@@ -83,7 +83,7 @@ fi
 mkdir $DIR/$GROUP/raw_data/useage/$CLIENTS-$TIME
 # sleep $TIME
 sleep $TIME
-sleep 5
+sleep 40
 for ((i=1;i<=$S;i++))
 do
     scp server$i:epaxos/server$i.csv $DIR/$GROUP/raw_data/useage/$CLIENTS-$TIME/
