@@ -306,7 +306,7 @@ func (r *Replica) run() {
 
 func (r *Replica) clock() {
 	for !r.Shutdown {
-		time.Sleep(10 * 1000 * 1000)
+		time.Sleep(50 * 1000 * 1000)
 		r.clockChan <- true
 	}
 }
