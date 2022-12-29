@@ -86,7 +86,7 @@ sleep $TIME
 sleep 5
 for ((i=1;i<=$S;i++))
 do
-    scp server$i:epaxos/server$i.csv $DIR/$GROUP/raw_data/useage/$CLIENTS-$TIME/.
+    scp server$i:epaxos/server$i.csv $DIR/$GROUP/raw_data/useage/$CLIENTS-$TIME/
     ssh server$i "cd epaxos; ./stop.sh server.pid;" &
 done
 
