@@ -6,7 +6,7 @@ do
 	sleep 5
 	./AWSreboot.sh
 	sleep 30
-	./driver.sh -d testresult -t 60 -g 3batching$1ms -c $i -a mo -s 3
+	./driver.sh -d testresult -t 60 -g 3batching$1ms -c $i -a mo -s $2
 	
 	echo "mo $i finish"
 done
