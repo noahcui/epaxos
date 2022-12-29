@@ -47,6 +47,10 @@ export GOPATH=/Users/noahcui/Desktop/UNH/22fall/Research/epaxos
 
 bin/master &
 sleep 1
+ssh server1 "cd epaxos/bin; ./monitor.py > server1.csv" &
+ssh server2 "cd epaxos/bin; ./monitor.py > server2.csv" &
+ssh server3 "cd epaxos/bin; ./monitor.py > server3.csv" &
+
 ssh server1 "cd epaxos; ./start.sh $master $server1 $ALG server.pid" &
 ssh server2 "cd epaxos; ./start.sh $master $server2 $ALG server.pid" &
 ssh server3 "cd epaxos; ./start.sh $master $server3 $ALG server.pid" &
