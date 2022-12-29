@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"epaxos"
 	"flag"
 	"fmt"
@@ -19,10 +18,6 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"time"
-
-	"github.com/shirou/gopsutil/cpu"
-	"github.com/shirou/gopsutil/disk"
-	"github.com/shirou/gopsutil/mem"
 )
 
 var portnum *int = flag.Int("port", 7070, "Port # to listen on. Defaults to 7070")
@@ -111,24 +106,6 @@ func registerWithMaster(masterAddr string) (int, []string) {
 	}
 
 	return reply.ReplicaId, reply.NodeList
-}
-
-func printResource(Id int) {
-	file, err := os.Create("resourceUsage/" + string(Id) + ".csv")
-	if err != nil {
-		fmt.Println(err)
-	}
-	defer file.Close()
-
-	w := bufio.NewWriter(file)
-	fmt.Fprintln(w, "cpuUsage, perCpuUsage, vmStat, diskStat")
-	for {
-		cpuUsage, _ := cpu.Percent(0, false)
-		perCpuUsage, _ := cpu.Percent(0, true)
-		vmStat, _ := mem.VirtualMemory()
-		diskStat, _ := disk.Usage("/")
-		fmt.Fprintln(w, "%v,%v,%v,%v", cpuUsage, perCpuUsage, vmStat, diskStat)
-	}
 }
 
 func catchKill(interrupt chan os.Signal) {
