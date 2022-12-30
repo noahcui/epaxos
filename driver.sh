@@ -56,7 +56,7 @@ sleep 1
 
 for ((i=1;i<=$S;i++))
 do
-    ssh server$i "cd epaxos/bin; ./monitor.py > server$i.csv" &
+    ssh server$i "cd epaxos; ./monitor.py > server$i.csv" &
     ssh server$i "cd epaxos; ./start.sh $master ${servers[$i]} $ALG server.pid" &
 done
 # ssh server1 "cd epaxos/bin; ./monitor.py > server1.csv" &
