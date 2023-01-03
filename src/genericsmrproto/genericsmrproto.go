@@ -14,11 +14,13 @@ const (
 	GENERIC_SMR_BEACON
 	GENERIC_SMR_BEACON_REPLY
 )
+const WEIGHTSIZE = 256
 
 type Propose struct {
 	CommandId int32
 	Command   state.Command
 	Timestamp int64
+	Weight    [WEIGHTSIZE]byte
 }
 
 type ProposeReply struct {
@@ -32,7 +34,6 @@ type ProposeReplyTS struct {
 	CommandId int32
 	Value     state.Value
 	Timestamp int64
-	Weight    [256]byte
 }
 
 type Read struct {

@@ -61,7 +61,7 @@ var start []map[int32]time.Time
 var end []map[int32]time.Time
 var values []string
 var numValues = 1024
-var weight [256]byte
+var weight [genericsmrproto.WEIGHTSIZE]byte
 
 func clientWriter(idx int, writerList []*bufio.Writer, stop chan int, next chan int, wg *sync.WaitGroup) {
 	if writerList == nil {

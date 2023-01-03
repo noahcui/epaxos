@@ -39,7 +39,7 @@ func (p *ProposeCache) Put(t *Propose) {
 	p.mu.Unlock()
 }
 func (t *Propose) Marshal(wire io.Writer) {
-	var b [8]byte
+	var b [WEIGHTSIZE]byte
 	var bs []byte
 	bs = b[:4]
 	tmp32 := t.CommandId
@@ -60,10 +60,16 @@ func (t *Propose) Marshal(wire io.Writer) {
 	bs[6] = byte(tmp64 >> 48)
 	bs[7] = byte(tmp64 >> 56)
 	wire.Write(bs)
+	bs = b[:WEIGHTSIZE]
+	tmp256 := t.Weight
+	for i := 0; i < WEIGHTSIZE; i++ {
+		bs[i] = byte(tmp256[i])
+	}
+	wire.Write(bs)
 }
 
 func (t *Propose) Unmarshal(wire io.Reader) error {
-	var b [8]byte
+	var b [WEIGHTSIZE]byte
 	var bs []byte
 	bs = b[:4]
 	if _, err := io.ReadAtLeast(wire, bs, 4); err != nil {
@@ -76,6 +82,13 @@ func (t *Propose) Unmarshal(wire io.Reader) error {
 		return err
 	}
 	t.Timestamp = int64((uint64(bs[0]) | (uint64(bs[1]) << 8) | (uint64(bs[2]) << 16) | (uint64(bs[3]) << 24) | (uint64(bs[4]) << 32) | (uint64(bs[5]) << 40) | (uint64(bs[6]) << 48) | (uint64(bs[7]) << 56)))
+	bs = b[:WEIGHTSIZE]
+	if _, err := io.ReadAtLeast(wire, bs, WEIGHTSIZE); err != nil {
+		return err
+	}
+	for i := 0; i < WEIGHTSIZE; i++ {
+		t.Weight[i] = bs[i]
+	}
 	return nil
 }
 
@@ -699,7 +712,7 @@ func (p *ProposeReplyTSCache) Put(t *ProposeReplyTS) {
 	p.mu.Unlock()
 }
 func (t *ProposeReplyTS) Marshal(wire io.Writer) {
-	var b [256]byte
+	var b [8]byte
 	var bs []byte
 	bs = b[:5]
 	bs[0] = byte(t.OK)
@@ -721,12 +734,6 @@ func (t *ProposeReplyTS) Marshal(wire io.Writer) {
 	bs[6] = byte(tmp64 >> 48)
 	bs[7] = byte(tmp64 >> 56)
 	wire.Write(bs)
-	bs = b[:256]
-	tmp256 := t.Weight
-	for i := 0; i < 256; i++ {
-		bs[i] = byte(tmp256[i])
-	}
-	wire.Write(bs)
 }
 
 func (t *ProposeReplyTS) Unmarshal(wire io.Reader) error {
@@ -744,13 +751,5 @@ func (t *ProposeReplyTS) Unmarshal(wire io.Reader) error {
 		return err
 	}
 	t.Timestamp = int64((uint64(bs[0]) | (uint64(bs[1]) << 8) | (uint64(bs[2]) << 16) | (uint64(bs[3]) << 24) | (uint64(bs[4]) << 32) | (uint64(bs[5]) << 40) | (uint64(bs[6]) << 48) | (uint64(bs[7]) << 56)))
-
-	bs = b[:256]
-	if _, err := io.ReadAtLeast(wire, bs, 256); err != nil {
-		return err
-	}
-	for i := 0; i < 256; i++ {
-		t.Weight[i] = bs[i]
-	}
 	return nil
 }
