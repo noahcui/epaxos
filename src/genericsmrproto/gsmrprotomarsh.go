@@ -737,7 +737,7 @@ func (t *ProposeReplyTS) Marshal(wire io.Writer) {
 }
 
 func (t *ProposeReplyTS) Unmarshal(wire io.Reader) error {
-	var b [256]byte
+	var b [8]byte
 	var bs []byte
 	bs = b[:5]
 	if _, err := io.ReadAtLeast(wire, bs, 5); err != nil {
