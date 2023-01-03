@@ -69,7 +69,7 @@ func clientWriter(idx int, writerList []*bufio.Writer, stop chan int, next chan 
 		return
 	}
 	fmt.Println(writerList)
-	args := genericsmrproto.Propose{0 /* id */, state.Command{state.PUT, 0, 0}, 0, weight /* timestamp */}
+	args := genericsmrproto.Propose{0 /* id */, state.Command{state.PUT, 0, 0}, 0 /* timestamp */, weight}
 	for id := int32(0); ; id++ {
 		select {
 		case i := <-stop:
