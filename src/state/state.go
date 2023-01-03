@@ -19,9 +19,9 @@ const (
 	PUT_BLIND // Result not needed immediately
 )
 
-type Value string
+type Value int64
 
-const NIL Value = ""
+const NIL Value = 0
 
 type Key int64
 

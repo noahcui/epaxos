@@ -61,6 +61,7 @@ var start []map[int32]time.Time
 var end []map[int32]time.Time
 var values []string
 var numValues = 1024
+var weight [256]byte
 
 func clientWriter(idx int, writerList []*bufio.Writer, stop chan int, next chan int, wg *sync.WaitGroup) {
 	if writerList == nil {
@@ -68,7 +69,7 @@ func clientWriter(idx int, writerList []*bufio.Writer, stop chan int, next chan 
 		return
 	}
 	fmt.Println(writerList)
-	args := genericsmrproto.Propose{0 /* id */, state.Command{state.PUT, 0, randSeq(256)}, 0 /* timestamp */}
+	args := genericsmrproto.Propose{0 /* id */, state.Command{state.PUT, 0, 0}, weight /* timestamp */}
 	for id := int32(0); ; id++ {
 		select {
 		case i := <-stop:
@@ -174,10 +175,6 @@ func randSeq(n int) string {
 
 func main() {
 	flag.Parse()
-	//init values
-	for i := 0; i < numValues; i++ {
-		values = append(values, randSeq(256))
-	}
 	runtime.GOMAXPROCS(*procs)
 	if *conflicts > 100 {
 		log.Fatalf("Conflicts percentage must be between 0 and 100.\n")
