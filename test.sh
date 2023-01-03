@@ -13,7 +13,7 @@ done
 
 sleep 240
 
-for ((i=1;i<=20;i+=1))
+for ((i=2;i<=40;i+=1))
 do
 	echo "mo $i"
 	sleep 5
