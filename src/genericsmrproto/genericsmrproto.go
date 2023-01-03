@@ -14,7 +14,7 @@ const (
 	GENERIC_SMR_BEACON
 	GENERIC_SMR_BEACON_REPLY
 )
-const WEIGHTSIZE = 256
+const WEIGHTSIZE = 1024
 
 type Propose struct {
 	CommandId int32

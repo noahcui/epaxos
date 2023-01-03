@@ -17,7 +17,8 @@ ALG="mo"
 KILL=-1
 CLIENTS=1
 S=3
-while getopts "a:d:t:k:c:g:s:" OPTION; 
+T=1
+while getopts "a:d:t:k:c:g:s:t:" OPTION; 
 do
     case "$OPTION" in
     d)
@@ -40,6 +41,9 @@ do
         ;;
     s)
         S=$OPTARG
+        ;;
+    t)
+        T==$OPTARG
         ;;
     esac
 done
@@ -74,7 +78,7 @@ done
 # echo $! >> ${PID_FILE2}
 # give it some time to settle down
 sleep 5
-bin/client -e -t $TIME -T $CLIENTS -think 1 -path $DIR/$GROUP/raw_data/$CLIENTS-$TIME > $DIR/$GROUP/$CLIENTS-$TIME &
+bin/client -e -t $TIME -T $CLIENTS -think $T -path $DIR/$GROUP/raw_data/$CLIENTS-$TIME > $DIR/$GROUP/$CLIENTS-$TIME &
 
 if((KILL>0)); then
 sleep $KILL
