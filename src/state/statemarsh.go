@@ -14,7 +14,7 @@ func (t *Command) Marshal(w io.Writer) {
 	bs = b[:8]
 	binary.LittleEndian.PutUint64(bs, uint64(t.K))
 	w.Write(bs)
-	binary.LittleEndian.PutUint64(bs, uint64(t.V))
+	binary.LittleEndian.PutUint64(bs, string(t.V))
 	w.Write(bs)
 }
 
