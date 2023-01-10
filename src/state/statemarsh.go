@@ -6,7 +6,7 @@ import (
 )
 
 func (t *Command) Marshal(w io.Writer) {
-	var b [8]byte
+	var b [WEIGHTSIZE]byte
 	bs := b[:8]
 	bs = b[:1]
 	b[0] = byte(t.Op)
@@ -16,6 +16,12 @@ func (t *Command) Marshal(w io.Writer) {
 	w.Write(bs)
 	binary.LittleEndian.PutUint64(bs, uint64(t.V))
 	w.Write(bs)
+	bs = b[:WEIGHTSIZE]
+	tmp256 := t.Weight
+	for i := 0; i < WEIGHTSIZE; i++ {
+		bs[i] = byte(tmp256[i])
+	}
+	wire.Write(bs)
 }
 
 func (t *Command) Unmarshal(r io.Reader) error {
@@ -35,6 +41,14 @@ func (t *Command) Unmarshal(r io.Reader) error {
 		return err
 	}
 	t.V = Value(binary.LittleEndian.Uint64(bs))
+
+	bs = b[:WEIGHTSIZE]
+	if _, err := io.ReadAtLeast(r, bs, WEIGHTSIZE); err != nil {
+		return err
+	}
+	for i := 0; i < WEIGHTSIZE; i++ {
+		t.Weight[i] = bs[i]
+	}
 	return nil
 }
 

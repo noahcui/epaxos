@@ -20,7 +20,7 @@ type Propose struct {
 	CommandId int32
 	Command   state.Command
 	Timestamp int64
-	Weight    [WEIGHTSIZE]byte
+	// Weight    [WEIGHTSIZE]byte
 }
 
 type ProposeReply struct {

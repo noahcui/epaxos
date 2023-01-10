@@ -22,13 +22,15 @@ const (
 type Value int64
 
 const NIL Value = 0
+const WEIGHTSIZE = 1024
 
 type Key int64
 
 type Command struct {
-	Op Operation
-	K  Key
-	V  Value
+	Op     Operation
+	K      Key
+	V      Value
+	Weight [WEIGHTSIZE]byte
 }
 
 type State struct {

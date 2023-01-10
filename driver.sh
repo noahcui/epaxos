@@ -18,7 +18,7 @@ KILL=-1
 CLIENTS=1
 S=3
 T=1
-while getopts "a:d:t:k:c:g:s:t:" OPTION; 
+while getopts "a:d:t:k:c:g:s:i:" OPTION; 
 do
     case "$OPTION" in
     d)
@@ -42,7 +42,7 @@ do
     s)
         S=$OPTARG
         ;;
-    t)
+    i)
         T==$OPTARG
         ;;
     esac
