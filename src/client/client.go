@@ -123,7 +123,7 @@ func clientWriter(idx int, writerList []*bufio.Writer, stop chan int, next chan 
 			mu.Lock()
 			totalout += 1
 			mu.Unlock()
-			time.Sleep(time.Nanosecond * time.Duration(*thinktime*1000*1000))
+			time.Sleep(time.Nanosecond * time.Duration(*thinktime*100*1000))
 		}
 	}
 }

@@ -43,7 +43,7 @@ do
         S=$OPTARG
         ;;
     i)
-        T==$OPTARG
+        T=$OPTARG
         ;;
     esac
 done
