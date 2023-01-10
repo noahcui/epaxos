@@ -22,7 +22,7 @@ const MAX_SKIPS_WAITING = 20
 const TRUE = uint8(1)
 const FALSE = uint8(0)
 
-func upadteWeightRandom() []byte {
+func upadteWeightRandom() [genericsmrproto.WEIGHTSIZE]byte {
 	to_return := make([]byte, genericsmrproto.WEIGHTSIZE)
 	rand.Read(to_return)
 	return to_return
