@@ -69,7 +69,7 @@ func clientWriter(idx int, writerList []*bufio.Writer, stop chan int, next chan 
 	}
 	fmt.Println(writerList)
 	upadteWeightRandom()
-	args := genericsmrproto.Propose{0 /* id */, state.Command{state.PUT, 0, 0}, 0 /* timestamp */}
+	args := genericsmrproto.Propose{0 /* id */, state.Command{state.PUT, 0, 0, upadteWeightRandom()}, 0 /* timestamp */}
 	for id := int32(0); ; id++ {
 		select {
 		case i := <-stop:
@@ -103,7 +103,6 @@ func clientWriter(idx int, writerList []*bufio.Writer, stop chan int, next chan 
 			} else {
 				args.Command.K = state.Key(r)
 			}
-			args.Weight = upadteWeightRandom()
 			now := time.Now()
 			args.Timestamp = now.UnixNano()
 			// Determine operation type
