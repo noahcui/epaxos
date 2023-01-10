@@ -7,7 +7,7 @@ do
 	sleep 5
 	./AWSreboot.sh
 	sleep 30
-	./driver.sh -d testresult -t 60 -g 3batching3ms_t10 -c $i -a mo -s 3 -i 5
+	./driver.sh -d testresult -t 60 -g 3batching3ms_t5 -c $i -a mo -s 3 -i 5
 	
 	echo "mo $i finish"
 done
@@ -20,7 +20,7 @@ do
 	sleep 5
 	./AWSreboot.sh
 	sleep 30
-	./driver.sh -d testresult -t 60 -g 3nobatching3ms_t10 -c $i -a m -s 3 -i 5
+	./driver.sh -d testresult -t 60 -g 3nobatching3ms_t5 -c $i -a m -s 3 -i 5
 	
 	echo "mo $i finish"
 done
