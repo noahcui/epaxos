@@ -21,7 +21,7 @@ func (t *Command) Marshal(w io.Writer) {
 	for i := 0; i < WEIGHTSIZE; i++ {
 		bs[i] = byte(tmp256[i])
 	}
-	wire.Write(bs)
+	w.Write(bs)
 }
 
 func (t *Command) Unmarshal(r io.Reader) error {
