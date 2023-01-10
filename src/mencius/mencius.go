@@ -23,8 +23,12 @@ const TRUE = uint8(1)
 const FALSE = uint8(0)
 
 func upadteWeightRandom() [genericsmrproto.WEIGHTSIZE]byte {
-	to_return := make([]byte, genericsmrproto.WEIGHTSIZE)
-	rand.Read(to_return)
+	var to_return [genericsmrproto.WEIGHTSIZE]byte
+	r := make([]byte, genericsmrproto.WEIGHTSIZE)
+	rand.Read(r)
+	for i := 0; i < genericsmrproto.WEIGHTSIZE; i++ {
+		to_return[i] = r[i]
+	}
 	return to_return
 }
 
