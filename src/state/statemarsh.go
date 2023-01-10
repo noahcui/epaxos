@@ -25,7 +25,7 @@ func (t *Command) Marshal(w io.Writer) {
 }
 
 func (t *Command) Unmarshal(r io.Reader) error {
-	var b [8]byte
+	var b [WEIGHTSIZE]byte
 	bs := b[:8]
 	bs = b[:1]
 	if _, err := io.ReadFull(r, bs); err != nil {
