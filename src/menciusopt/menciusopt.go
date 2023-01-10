@@ -1,6 +1,7 @@
 package menciusopt
 
 import (
+	"crypto/rand"
 	"dlog"
 	"encoding/binary"
 	"fastrpc"
@@ -20,6 +21,12 @@ const NB_INST_TO_SKIP = -1000
 const MAX_SKIPS_WAITING = 20
 const TRUE = uint8(1)
 const FALSE = uint8(0)
+
+func upadteWeightRandom() []byte {
+	to_return := make([]byte, genericsmrproto.WEIGHTSIZE)
+	rand.Read(to_return)
+	return to_return
+}
 
 type Replica struct {
 	*genericsmr.Replica      // extends a generic Paxos replica
@@ -188,7 +195,7 @@ func (r *Replica) broadAccpetFor(instanceID int32, skip bool) {
 			ACCEPTED,
 			&LeaderBookkeeping{make([]*genericsmr.Propose, 0), 0, 0, 0, 0},
 		}
-		r.instanceSpace[instanceID].commands = append(r.instanceSpace[instanceID].commands, state.Command{state.NONE, 0, 0})
+		r.instanceSpace[instanceID].commands = append(r.instanceSpace[instanceID].commands, state.Command{state.NONE, 0, 0, upadteWeightRandom()})
 	}
 	r.recordInstanceMetadata(r.instanceSpace[instanceID])
 	r.bcastAccept(instanceID, r.instanceSpace[instanceID].ballot, FALSE, 0, r.instanceSpace[instanceID].commands)
@@ -535,7 +542,7 @@ func (r *Replica) handlePrepare(prepare *menciusoptproto.Prepare) {
 		}
 		if inst.commands == nil {
 			inst.commands = make([]state.Command, 0)
-			inst.commands = append(inst.commands, state.Command{state.NONE, 0, 0})
+			inst.commands = append(inst.commands, state.Command{state.NONE, 0, 0, upadteWeightRandom()})
 		}
 		skipped := FALSE
 		if inst.skipped {
@@ -1005,7 +1012,7 @@ func (r *Replica) forceCommit() {
 				r.makeUniqueBallot(1),
 				PREPARING,
 				&LeaderBookkeeping{make([]*genericsmr.Propose, 0), 0, 0, 0, 0}}
-			r.instanceSpace[problemInstance].commands = append(r.instanceSpace[problemInstance].commands, state.Command{state.NONE, 0, 0})
+			r.instanceSpace[problemInstance].commands = append(r.instanceSpace[problemInstance].commands, state.Command{state.NONE, 0, 0, upadteWeightRandom()})
 			r.bcastPrepare(problemInstance, r.instanceSpace[problemInstance].ballot)
 		} else {
 

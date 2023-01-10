@@ -2,6 +2,7 @@ package gpaxos
 
 import (
 	"bufio"
+	"crypto/rand"
 	"dlog"
 	"genericsmr"
 	"genericsmrproto"
@@ -18,6 +19,12 @@ const FALSE = uint8(0)
 const CMDS_PER_BALLOT = 40
 
 const ALL_TO_ALL = true
+
+func upadteWeightRandom() []byte {
+	to_return := make([]byte, genericsmrproto.WEIGHTSIZE)
+	rand.Read(to_return)
+	return to_return
+}
 
 type Replica struct {
 	*genericsmr.Replica // extends a generic Paxos replica
@@ -218,7 +225,7 @@ func (r *Replica) replyPrepare(reply *gpaxosproto.PrepareReply, w *bufio.Writer)
 func (r *Replica) send1b(msg *gpaxosproto.M_1b, w *bufio.Writer) {
 	w.WriteByte(gpaxosproto.M1B)
 	msg.Marshal(w)
-	dummy := state.Command{0, 0, 0}
+	dummy := state.Command{0, 0, 0, upadteWeightRandom()}
 	for _, cid := range msg.Cstruct {
 		if cmd, present := r.commands[cid]; present {
 			cmd.Marshal(w)

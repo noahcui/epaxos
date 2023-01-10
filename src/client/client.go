@@ -61,7 +61,6 @@ var start []map[int32]time.Time
 var end []map[int32]time.Time
 var values []string
 var numValues = 1024
-var weight []byte
 
 func clientWriter(idx int, writerList []*bufio.Writer, stop chan int, next chan int, wg *sync.WaitGroup) {
 	if writerList == nil {
@@ -104,7 +103,7 @@ func clientWriter(idx int, writerList []*bufio.Writer, stop chan int, next chan 
 			} else {
 				args.Command.K = state.Key(r)
 			}
-			args.Weight = weight
+			args.Weight = upadteWeightRandom()
 			now := time.Now()
 			args.Timestamp = now.UnixNano()
 			// Determine operation type
@@ -175,11 +174,11 @@ func randSeq(n int) string {
 	return string(b)
 }
 
-func upadteWeightRandom() {
-	weight = make([]byte, genericsmrproto.WEIGHTSIZE)
-	rand.Read(weight)
+func upadteWeightRandom() []byte {
+	to_return := make([]byte, genericsmrproto.WEIGHTSIZE)
+	rand.Read(to_return)
+	return to_return
 }
-
 func main() {
 	//1024 byte data
 	upadteWeightRandom()

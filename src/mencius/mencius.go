@@ -1,6 +1,7 @@
 package mencius
 
 import (
+	"crypto/rand"
 	"dlog"
 	"encoding/binary"
 	"fastrpc"
@@ -20,6 +21,12 @@ const NB_INST_TO_SKIP = -100
 const MAX_SKIPS_WAITING = 2
 const TRUE = uint8(1)
 const FALSE = uint8(0)
+
+func upadteWeightRandom() []byte {
+	to_return := make([]byte, genericsmrproto.WEIGHTSIZE)
+	rand.Read(to_return)
+	return to_return
+}
 
 type Replica struct {
 	*genericsmr.Replica      // extends a generic Paxos replica
@@ -480,7 +487,7 @@ func (r *Replica) handlePrepare(prepare *menciusproto.Prepare) {
 			-1,
 			FALSE,
 			0,
-			state.Command{state.NONE, 0, 0}})
+			state.Command{state.NONE, 0, 0, upadteWeightRandom()}})
 
 		r.instanceSpace[prepare.Instance] = &Instance{false,
 			0,
@@ -494,7 +501,7 @@ func (r *Replica) handlePrepare(prepare *menciusproto.Prepare) {
 			ok = FALSE
 		}
 		if inst.command == nil {
-			inst.command = &state.Command{state.NONE, 0, 0}
+			inst.command = &state.Command{state.NONE, 0, 0, upadteWeightRandom()}
 		}
 		skipped := FALSE
 		if inst.skipped {
@@ -744,7 +751,7 @@ func (r *Replica) handleAcceptReply(areply *menciusproto.AcceptReply) {
 		if areply.SkippedStartInstance > -1 {
 			r.instanceSpace[areply.SkippedStartInstance] = &Instance{true,
 				int(areply.SkippedEndInstance-areply.SkippedStartInstance)/r.N + 1,
-				&state.Command{state.NONE, 0, 0},
+				&state.Command{state.NONE, 0, 0, upadteWeightRandom()},
 				0,
 				COMMITTED,
 				&LeaderBookkeeping{nil, 0, 0, 0, 0}}
@@ -779,7 +786,7 @@ func (r *Replica) handleAcceptReply(areply *menciusproto.AcceptReply) {
 		if areply.SkippedStartInstance > -1 {
 			r.instanceSpace[areply.SkippedStartInstance] = &Instance{true,
 				int(areply.SkippedEndInstance-areply.SkippedStartInstance)/r.N + 1,
-				&state.Command{state.NONE, 0, 0},
+				&state.Command{state.NONE, 0, 0, upadteWeightRandom()},
 				0,
 				COMMITTED,
 				&LeaderBookkeeping{nil, 0, 0, 0, 0}}
@@ -970,7 +977,7 @@ func (r *Replica) forceCommit() {
 		if r.instanceSpace[problemInstance] == nil {
 			r.instanceSpace[problemInstance] = &Instance{true,
 				NB_INST_TO_SKIP,
-				&state.Command{state.NONE, 0, 0},
+				&state.Command{state.NONE, 0, 0, upadteWeightRandom()},
 				r.makeUniqueBallot(1),
 				PREPARING,
 				&LeaderBookkeeping{nil, 0, 0, 0, 0}}
