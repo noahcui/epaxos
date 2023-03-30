@@ -4,18 +4,19 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"genericsmrproto"
 	"log"
-	"masterproto"
 	"math/rand"
 	"net"
 	"net/rpc"
 	"os"
 	"runtime"
 	"sort"
-	"state"
 	"sync"
 	"time"
+
+	"github.com/noahcui/epaxos/genericsmrproto"
+	"github.com/noahcui/epaxos/masterproto"
+	"github.com/noahcui/epaxos/state"
 )
 
 var outstandingReqs = flag.Int64("or", 1, "Number of outstanding requests a thread can have at any given time.")

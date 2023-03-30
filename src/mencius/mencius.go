@@ -2,17 +2,18 @@ package mencius
 
 import (
 	"crypto/rand"
-	"dlog"
 	"encoding/binary"
-	"fastrpc"
 	"fmt"
-	"genericsmr"
-	"genericsmrproto"
 	"io"
 	"log"
-	"menciusproto"
-	"state"
 	"time"
+
+	"github.com/noahcui/epaxos/dlog"
+	"github.com/noahcui/epaxos/fastrpc"
+	"github.com/noahcui/epaxos/genericsmr"
+	"github.com/noahcui/epaxos/genericsmrproto"
+	"github.com/noahcui/epaxos/menciusproto"
+	"github.com/noahcui/epaxos/state"
 )
 
 const CHAN_BUFFER_SIZE = 200000
@@ -136,7 +137,7 @@ func NewReplica(id int, peerAddrList []string, thrifty bool, exec bool, dreply b
 	return r
 }
 
-//append a log entry to stable storage
+// append a log entry to stable storage
 func (r *Replica) recordInstanceMetadata(inst *Instance) {
 	if !r.Durable {
 		return
@@ -154,7 +155,7 @@ func (r *Replica) recordInstanceMetadata(inst *Instance) {
 	r.StableStore.Write(b[:])
 }
 
-//write a sequence of commands to stable storage
+// write a sequence of commands to stable storage
 func (r *Replica) recordCommand(cmd *state.Command) {
 	if !r.Durable {
 		return
@@ -166,7 +167,7 @@ func (r *Replica) recordCommand(cmd *state.Command) {
 	cmd.Marshal(io.Writer(r.StableStore))
 }
 
-//sync with the stable store
+// sync with the stable store
 func (r *Replica) sync() {
 	if !r.Durable {
 		return

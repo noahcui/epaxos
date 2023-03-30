@@ -1,7 +1,7 @@
 package epaxosproto
 
 import (
-	"state"
+	"github.com/noahcui/epaxos/state"
 )
 
 type Prepare struct {

@@ -1,23 +1,24 @@
 package main
 
 import (
-	"epaxos"
 	"flag"
 	"fmt"
-	"gpaxos"
 	"log"
-	"masterproto"
-	"mencius"
-	"menciusopt"
 	"net"
 	"net/http"
 	"net/rpc"
 	"os"
 	"os/signal"
-	"paxos"
 	"runtime"
 	"runtime/pprof"
 	"time"
+
+	"github.com/noahcui/epaxos/epaxos"
+	"github.com/noahcui/epaxos/gpaxos"
+	"github.com/noahcui/epaxos/masterproto"
+	"github.com/noahcui/epaxos/mencius"
+	"github.com/noahcui/epaxos/menciusopt"
+	"github.com/noahcui/epaxos/paxos"
 )
 
 var portnum *int = flag.Int("port", 7070, "Port # to listen on. Defaults to 7070")

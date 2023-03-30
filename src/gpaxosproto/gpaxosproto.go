@@ -1,7 +1,7 @@
 package gpaxosproto
 
 //import (
-//    "state"
+//    "github.com/noahcui/epaxos/state"
 //)
 
 const (

@@ -1,7 +1,7 @@
 package genericsmrproto
 
 import (
-	"state"
+	"github.com/noahcui/epaxos/state"
 )
 
 const (

@@ -3,10 +3,12 @@ package menciusoptproto
 import (
 	"bufio"
 	"encoding/binary"
-	"fastrpc"
 	"io"
-	"state"
 	"sync"
+
+	"github.com/noahcui/epaxos/state"
+
+	"github.com/noahcui/epaxos/fastrpc"
 )
 
 type byteReader interface {

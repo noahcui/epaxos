@@ -1,9 +1,10 @@
 package menciusproto
 
 import (
-	"fastrpc"
 	"io"
 	"sync"
+
+	"github.com/noahcui/epaxos/fastrpc"
 )
 
 func (t *Skip) New() fastrpc.Serializable {

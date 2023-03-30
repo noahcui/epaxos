@@ -3,14 +3,15 @@ package gpaxos
 import (
 	"bufio"
 	"crypto/rand"
-	"dlog"
-	"genericsmr"
-	"genericsmrproto"
-	"gpaxosproto"
 	"log"
-	"state"
 	"sync"
 	"time"
+
+	"github.com/noahcui/epaxos/dlog"
+	"github.com/noahcui/epaxos/genericsmr"
+	"github.com/noahcui/epaxos/genericsmrproto"
+	"github.com/noahcui/epaxos/gpaxosproto"
+	"github.com/noahcui/epaxos/state"
 )
 
 const CHAN_BUFFER_SIZE = 200000
