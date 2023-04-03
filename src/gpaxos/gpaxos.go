@@ -2,16 +2,15 @@ package gpaxos
 
 import (
 	"bufio"
-	"crypto/rand"
 	"log"
 	"sync"
 	"time"
 
-	"github.com/noahcui/epaxos/dlog"
-	"github.com/noahcui/epaxos/genericsmr"
-	"github.com/noahcui/epaxos/genericsmrproto"
-	"github.com/noahcui/epaxos/gpaxosproto"
-	"github.com/noahcui/epaxos/state"
+	"github.com/noahcui/epaxos/src/dlog"
+	"github.com/noahcui/epaxos/src/genericsmr"
+	"github.com/noahcui/epaxos/src/genericsmrproto"
+	"github.com/noahcui/epaxos/src/gpaxosproto"
+	"github.com/noahcui/epaxos/src/state"
 )
 
 const CHAN_BUFFER_SIZE = 200000
@@ -20,16 +19,6 @@ const FALSE = uint8(0)
 const CMDS_PER_BALLOT = 40
 
 const ALL_TO_ALL = true
-
-func upadteWeightRandom() [genericsmrproto.WEIGHTSIZE]byte {
-	var to_return [genericsmrproto.WEIGHTSIZE]byte
-	r := make([]byte, genericsmrproto.WEIGHTSIZE)
-	rand.Read(r)
-	for i := 0; i < genericsmrproto.WEIGHTSIZE; i++ {
-		to_return[i] = r[i]
-	}
-	return to_return
-}
 
 type Replica struct {
 	*genericsmr.Replica // extends a generic Paxos replica
@@ -167,7 +156,7 @@ func (r *Replica) handleReplicaConnection(rid int, reader *bufio.Reader) error {
 				cmd.Unmarshal(reader)
 				r.commandsMutex.Lock()
 				if _, present := r.commands[cid]; !present {
-					if cmd.Op != 0 || cmd.K != 0 || cmd.V != 0 {
+					if cmd.Op != 0 || cmd.K != 0 || cmd.V != state.NIL {
 						r.commands[cid] = cmd
 					}
 				}
@@ -230,7 +219,7 @@ func (r *Replica) replyPrepare(reply *gpaxosproto.PrepareReply, w *bufio.Writer)
 func (r *Replica) send1b(msg *gpaxosproto.M_1b, w *bufio.Writer) {
 	w.WriteByte(gpaxosproto.M1B)
 	msg.Marshal(w)
-	dummy := state.Command{0, 0, 0, upadteWeightRandom()}
+	dummy := state.Command{0, 0, ""}
 	for _, cid := range msg.Cstruct {
 		if cmd, present := r.commands[cid]; present {
 			cmd.Marshal(w)

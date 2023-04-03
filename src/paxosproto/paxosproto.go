@@ -1,7 +1,7 @@
 package paxosproto
 
 import (
-	"github.com/noahcui/epaxos/state"
+	"github.com/noahcui/epaxos/src/state"
 )
 
 const (

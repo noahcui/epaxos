@@ -6,48 +6,48 @@ import (
 )
 
 func (t *Command) Marshal(w io.Writer) {
-	var b [WEIGHTSIZE]byte
+	Vl := uint64(len(t.V))
+	var b [8]byte
 	bs := b[:8]
-	bs = b[:1]
 	b[0] = byte(t.Op)
+	bs = b[:1]
 	w.Write(bs)
 	bs = b[:8]
-	binary.LittleEndian.PutUint64(bs, uint64(t.K))
+	binary.BigEndian.PutUint64(bs, uint64(t.K))
 	w.Write(bs)
-	binary.LittleEndian.PutUint64(bs, uint64(t.V))
+	binary.BigEndian.PutUint64(bs, uint64(Vl))
 	w.Write(bs)
-	bs = b[:WEIGHTSIZE]
-	tmp256 := t.Weight
-	for i := 0; i < WEIGHTSIZE; i++ {
-		bs[i] = byte(tmp256[i])
-	}
-	w.Write(bs)
+	w.Write([]byte(t.V))
 }
 
 func (t *Command) Unmarshal(r io.Reader) error {
-	var b [WEIGHTSIZE]byte
+	var b [8]byte
 	bs := b[:8]
+
 	bs = b[:1]
 	if _, err := io.ReadFull(r, bs); err != nil {
 		return err
 	}
 	t.Op = Operation(b[0])
+
 	bs = b[:8]
 	if _, err := io.ReadFull(r, bs); err != nil {
 		return err
 	}
-	t.K = Key(binary.LittleEndian.Uint64(bs))
+	t.K = Key(binary.BigEndian.Uint64(bs))
+
 	if _, err := io.ReadFull(r, bs); err != nil {
 		return err
 	}
-	t.V = Value(binary.LittleEndian.Uint64(bs))
+	Vl := binary.BigEndian.Uint64(bs)
 
-	bs = b[:WEIGHTSIZE]
-	if _, err := io.ReadAtLeast(r, bs, WEIGHTSIZE); err != nil {
+	data := make([]byte, Vl)
+	if _, err := io.ReadFull(r, data); err != nil {
 		return err
 	}
-	for i := 0; i < WEIGHTSIZE; i++ {
-		t.Weight[i] = bs[i]
+	t.V = Value(data)
+	if Vl > 0 {
+		// fmt.Println(t.Op, t.K, Vl, string(data))
 	}
 	return nil
 }
@@ -55,15 +55,19 @@ func (t *Command) Unmarshal(r io.Reader) error {
 func (t *Key) Marshal(w io.Writer) {
 	var b [8]byte
 	bs := b[:8]
-	binary.LittleEndian.PutUint64(bs, uint64(*t))
+	binary.BigEndian.PutUint64(bs, uint64(*t))
 	w.Write(bs)
 }
 
 func (t *Value) Marshal(w io.Writer) {
+	Vl := uint64(len(*t))
 	var b [8]byte
 	bs := b[:8]
-	binary.LittleEndian.PutUint64(bs, uint64(*t))
+	binary.BigEndian.PutUint64(bs, uint64(Vl))
 	w.Write(bs)
+	// fmt.Println("marshal, value length: ", bs)
+	w.Write([]byte(*t))
+
 }
 
 func (t *Key) Unmarshal(r io.Reader) error {
@@ -72,7 +76,7 @@ func (t *Key) Unmarshal(r io.Reader) error {
 	if _, err := io.ReadFull(r, bs); err != nil {
 		return err
 	}
-	*t = Key(binary.LittleEndian.Uint64(bs))
+	*t = Key(binary.BigEndian.Uint64(bs))
 	return nil
 }
 
@@ -82,6 +86,12 @@ func (t *Value) Unmarshal(r io.Reader) error {
 	if _, err := io.ReadFull(r, bs); err != nil {
 		return err
 	}
-	*t = Value(binary.LittleEndian.Uint64(bs))
+	Vl := binary.BigEndian.Uint64(bs)
+	data := make([]byte, Vl)
+	if _, err := io.ReadFull(r, data); err != nil {
+		return err
+	}
+	V := Value(data)
+	t = &V
 	return nil
 }

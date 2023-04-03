@@ -2,7 +2,7 @@ package main
 
 import (
 	"log"
-	//	"github.com/noahcui/epaxos/dlog"
+	//	"github.com/noahcui/epaxos/src/dlog"
 	"bufio"
 	"flag"
 	"fmt"
@@ -12,9 +12,9 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/noahcui/epaxos/genericsmrproto"
-	"github.com/noahcui/epaxos/masterproto"
-	"github.com/noahcui/epaxos/state"
+	"github.com/noahcui/epaxos/src/genericsmrproto"
+	"github.com/noahcui/epaxos/src/masterproto"
+	"github.com/noahcui/epaxos/src/state"
 )
 
 var masterAddr *string = flag.String("maddr", "", "Master address. Defaults to localhost")
@@ -135,7 +135,7 @@ func simulatedClient(rlReply *masterproto.GetReplicaListReply, leader int, readi
 	}
 
 	id := int32(*idStart)
-	args := genericsmrproto.Propose{id, state.Command{state.PUT, 0, 0}}
+	args := genericsmrproto.Propose{id, state.Command{state.PUT, 0, state.NIL}}
 
 	n := *reqsNb
 

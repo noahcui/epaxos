@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/noahcui/epaxos/epaxosproto"
-	"github.com/noahcui/epaxos/genericsmr"
-	"github.com/noahcui/epaxos/state"
+	"github.com/noahcui/epaxos/src/epaxosproto"
+	"github.com/noahcui/epaxos/src/genericsmr"
+	"github.com/noahcui/epaxos/src/state"
 )
 
 func initReplica() *Replica {

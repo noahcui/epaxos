@@ -4,7 +4,7 @@ import (
 	"io"
 	"sync"
 
-	"github.com/noahcui/epaxos/fastrpc"
+	"github.com/noahcui/epaxos/src/fastrpc"
 )
 
 func (t *Skip) New() fastrpc.Serializable {

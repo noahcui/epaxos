@@ -60,12 +60,6 @@ func (t *Propose) Marshal(wire io.Writer) {
 	bs[6] = byte(tmp64 >> 48)
 	bs[7] = byte(tmp64 >> 56)
 	wire.Write(bs)
-	// bs = b[:WEIGHTSIZE]
-	// tmp256 := t.Weight
-	// for i := 0; i < WEIGHTSIZE; i++ {
-	// 	bs[i] = byte(tmp256[i])
-	// }
-	// wire.Write(bs)
 }
 
 func (t *Propose) Unmarshal(wire io.Reader) error {
@@ -76,19 +70,14 @@ func (t *Propose) Unmarshal(wire io.Reader) error {
 		return err
 	}
 	t.CommandId = int32((uint32(bs[0]) | (uint32(bs[1]) << 8) | (uint32(bs[2]) << 16) | (uint32(bs[3]) << 24)))
+	// fmt.Println("commandID: ", bs, t.CommandId)
 	t.Command.Unmarshal(wire)
 	bs = b[:8]
 	if _, err := io.ReadAtLeast(wire, bs, 8); err != nil {
 		return err
 	}
 	t.Timestamp = int64((uint64(bs[0]) | (uint64(bs[1]) << 8) | (uint64(bs[2]) << 16) | (uint64(bs[3]) << 24) | (uint64(bs[4]) << 32) | (uint64(bs[5]) << 40) | (uint64(bs[6]) << 48) | (uint64(bs[7]) << 56)))
-	// bs = b[:WEIGHTSIZE]
-	// if _, err := io.ReadAtLeast(wire, bs, WEIGHTSIZE); err != nil {
-	// 	return err
-	// }
-	// for i := 0; i < WEIGHTSIZE; i++ {
-	// 	t.Weight[i] = bs[i]
-	// }
+	// fmt.Println("Timestamp: ", bs, t.Timestamp)
 	return nil
 }
 
@@ -721,6 +710,7 @@ func (t *ProposeReplyTS) Marshal(wire io.Writer) {
 	bs[2] = byte(tmp32 >> 8)
 	bs[3] = byte(tmp32 >> 16)
 	bs[4] = byte(tmp32 >> 24)
+	// fmt.Println("ok&id: ", bs, t.CommandId)
 	wire.Write(bs)
 	t.Value.Marshal(wire)
 	bs = b[:8]

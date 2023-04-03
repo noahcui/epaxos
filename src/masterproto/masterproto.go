@@ -24,4 +24,5 @@ type GetReplicaListArgs struct {
 type GetReplicaListReply struct {
 	ReplicaList []string
 	Ready       bool
+	Leader      int64
 }

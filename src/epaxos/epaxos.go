@@ -8,13 +8,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/noahcui/epaxos/bloomfilter"
-	"github.com/noahcui/epaxos/dlog"
-	"github.com/noahcui/epaxos/epaxosproto"
-	"github.com/noahcui/epaxos/fastrpc"
-	"github.com/noahcui/epaxos/genericsmr"
-	"github.com/noahcui/epaxos/genericsmrproto"
-	"github.com/noahcui/epaxos/state"
+	"github.com/noahcui/epaxos/src/bloomfilter"
+	"github.com/noahcui/epaxos/src/dlog"
+	"github.com/noahcui/epaxos/src/epaxosproto"
+	"github.com/noahcui/epaxos/src/fastrpc"
+	"github.com/noahcui/epaxos/src/genericsmr"
+	"github.com/noahcui/epaxos/src/genericsmrproto"
+	"github.com/noahcui/epaxos/src/state"
 )
 
 const MAX_DEPTH_DEP = 10

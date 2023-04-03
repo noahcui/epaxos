@@ -19,18 +19,16 @@ const (
 	PUT_BLIND // Result not needed immediately
 )
 
-type Value int64
+type Value string
 
-const NIL Value = 0
-const WEIGHTSIZE = 1024
+const NIL Value = ""
 
 type Key int64
 
 type Command struct {
-	Op     Operation
-	K      Key
-	V      Value
-	Weight [WEIGHTSIZE]byte
+	Op Operation
+	K  Key
+	V  Value
 }
 
 type State struct {

@@ -1,7 +1,9 @@
-export GOPATH=/home/ubuntu/epaxos/
-git pull
+# export GOPATH=/home/ubuntu/epaxos/
+# git pull
 # rm -rf bin
-go install server
-go install client
-go install master
-bin/master
+cd bin
+go build ../src/server
+go build ../src/client
+go build ../src/master
+cd ..
+# bin/master

@@ -1,7 +1,7 @@
 package menciusoptproto
 
 import (
-	"github.com/noahcui/epaxos/state"
+	"github.com/noahcui/epaxos/src/state"
 )
 
 type Skip struct {

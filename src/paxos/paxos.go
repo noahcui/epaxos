@@ -6,12 +6,12 @@ import (
 	"log"
 	"time"
 
-	"github.com/noahcui/epaxos/dlog"
-	"github.com/noahcui/epaxos/fastrpc"
-	"github.com/noahcui/epaxos/genericsmr"
-	"github.com/noahcui/epaxos/genericsmrproto"
-	"github.com/noahcui/epaxos/paxosproto"
-	"github.com/noahcui/epaxos/state"
+	"github.com/noahcui/epaxos/src/dlog"
+	"github.com/noahcui/epaxos/src/fastrpc"
+	"github.com/noahcui/epaxos/src/genericsmr"
+	"github.com/noahcui/epaxos/src/genericsmrproto"
+	"github.com/noahcui/epaxos/src/paxosproto"
+	"github.com/noahcui/epaxos/src/state"
 )
 
 const CHAN_BUFFER_SIZE = 200000

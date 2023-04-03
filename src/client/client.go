@@ -14,9 +14,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/noahcui/epaxos/genericsmrproto"
-	"github.com/noahcui/epaxos/masterproto"
-	"github.com/noahcui/epaxos/state"
+	"github.com/noahcui/epaxos/src/genericsmrproto"
+	"github.com/noahcui/epaxos/src/masterproto"
+	"github.com/noahcui/epaxos/src/state"
 )
 
 var outstandingReqs = flag.Int64("or", 1, "Number of outstanding requests a thread can have at any given time.")
@@ -70,7 +70,7 @@ func clientWriter(idx int, writerList []*bufio.Writer, stop chan int, next chan 
 	}
 	fmt.Println(writerList)
 	upadteWeightRandom()
-	args := genericsmrproto.Propose{0 /* id */, state.Command{state.PUT, 0, 0, upadteWeightRandom()}, 0 /* timestamp */}
+	args := genericsmrproto.Propose{0 /* id */, state.Command{state.PUT, 0, state.Value(upadteWeightRandom())}, 0 /* timestamp */}
 	for id := int32(0); ; id++ {
 		select {
 		case i := <-stop:
@@ -174,14 +174,14 @@ func randSeq(n int) string {
 	return string(b)
 }
 
-func upadteWeightRandom() [genericsmrproto.WEIGHTSIZE]byte {
-	var to_return [genericsmrproto.WEIGHTSIZE]byte
-	r := make([]byte, genericsmrproto.WEIGHTSIZE)
+func upadteWeightRandom() string {
+	var to_return [128]byte
+	r := make([]byte, 128)
 	rand.Read(r)
-	for i := 0; i < genericsmrproto.WEIGHTSIZE; i++ {
+	for i := 0; i < 128; i++ {
 		to_return[i] = r[i]
 	}
-	return to_return
+	return string(to_return[:128])
 }
 
 func main() {

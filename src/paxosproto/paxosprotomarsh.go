@@ -6,9 +6,9 @@ import (
 	"io"
 	"sync"
 
-	"github.com/noahcui/epaxos/state"
+	"github.com/noahcui/epaxos/src/state"
 
-	"github.com/noahcui/epaxos/fastrpc"
+	"github.com/noahcui/epaxos/src/fastrpc"
 )
 
 type byteReader interface {

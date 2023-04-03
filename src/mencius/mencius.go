@@ -1,19 +1,18 @@
 package mencius
 
 import (
-	"crypto/rand"
 	"encoding/binary"
 	"fmt"
 	"io"
 	"log"
 	"time"
 
-	"github.com/noahcui/epaxos/dlog"
-	"github.com/noahcui/epaxos/fastrpc"
-	"github.com/noahcui/epaxos/genericsmr"
-	"github.com/noahcui/epaxos/genericsmrproto"
-	"github.com/noahcui/epaxos/menciusproto"
-	"github.com/noahcui/epaxos/state"
+	"github.com/noahcui/epaxos/src/dlog"
+	"github.com/noahcui/epaxos/src/fastrpc"
+	"github.com/noahcui/epaxos/src/genericsmr"
+	"github.com/noahcui/epaxos/src/genericsmrproto"
+	"github.com/noahcui/epaxos/src/menciusproto"
+	"github.com/noahcui/epaxos/src/state"
 )
 
 const CHAN_BUFFER_SIZE = 200000
@@ -22,16 +21,6 @@ const NB_INST_TO_SKIP = -100
 const MAX_SKIPS_WAITING = 2
 const TRUE = uint8(1)
 const FALSE = uint8(0)
-
-func upadteWeightRandom() [genericsmrproto.WEIGHTSIZE]byte {
-	var to_return [genericsmrproto.WEIGHTSIZE]byte
-	r := make([]byte, genericsmrproto.WEIGHTSIZE)
-	rand.Read(r)
-	for i := 0; i < genericsmrproto.WEIGHTSIZE; i++ {
-		to_return[i] = r[i]
-	}
-	return to_return
-}
 
 type Replica struct {
 	*genericsmr.Replica      // extends a generic Paxos replica
@@ -492,7 +481,7 @@ func (r *Replica) handlePrepare(prepare *menciusproto.Prepare) {
 			-1,
 			FALSE,
 			0,
-			state.Command{state.NONE, 0, 0, upadteWeightRandom()}})
+			state.Command{state.NONE, 0, ""}})
 
 		r.instanceSpace[prepare.Instance] = &Instance{false,
 			0,
@@ -506,7 +495,7 @@ func (r *Replica) handlePrepare(prepare *menciusproto.Prepare) {
 			ok = FALSE
 		}
 		if inst.command == nil {
-			inst.command = &state.Command{state.NONE, 0, 0, upadteWeightRandom()}
+			inst.command = &state.Command{state.NONE, 0, ""}
 		}
 		skipped := FALSE
 		if inst.skipped {
@@ -756,7 +745,7 @@ func (r *Replica) handleAcceptReply(areply *menciusproto.AcceptReply) {
 		if areply.SkippedStartInstance > -1 {
 			r.instanceSpace[areply.SkippedStartInstance] = &Instance{true,
 				int(areply.SkippedEndInstance-areply.SkippedStartInstance)/r.N + 1,
-				&state.Command{state.NONE, 0, 0, upadteWeightRandom()},
+				&state.Command{state.NONE, 0, state.NIL},
 				0,
 				COMMITTED,
 				&LeaderBookkeeping{nil, 0, 0, 0, 0}}
@@ -791,7 +780,7 @@ func (r *Replica) handleAcceptReply(areply *menciusproto.AcceptReply) {
 		if areply.SkippedStartInstance > -1 {
 			r.instanceSpace[areply.SkippedStartInstance] = &Instance{true,
 				int(areply.SkippedEndInstance-areply.SkippedStartInstance)/r.N + 1,
-				&state.Command{state.NONE, 0, 0, upadteWeightRandom()},
+				&state.Command{state.NONE, 0, state.NIL},
 				0,
 				COMMITTED,
 				&LeaderBookkeeping{nil, 0, 0, 0, 0}}
@@ -856,7 +845,7 @@ func (r *Replica) updateBlocking(instance int32) {
 				if inst.lb.clientProposal != nil && !r.Dreply {
 					// give client the all clear
 					dlog.Printf("Sending ACK for req. %d\n", inst.lb.clientProposal.CommandId)
-					r.ReplyProposeTS(&genericsmrproto.ProposeReplyTS{TRUE, inst.lb.clientProposal.CommandId, state.NIL, inst.lb.clientProposal.Timestamp},
+					r.ReplyProposeTS(&genericsmrproto.ProposeReplyTS{TRUE, inst.lb.clientProposal.CommandId, inst.lb.clientProposal.Command.Execute(r.State), inst.lb.clientProposal.Timestamp},
 						inst.lb.clientProposal.Reply)
 				}
 				skip := FALSE
@@ -944,7 +933,7 @@ func (r *Replica) executeCommands() {
 
 			if r.Dreply && inst.lb != nil && inst.lb.clientProposal != nil {
 				dlog.Printf("Sending ACK for req. %d\n", inst.lb.clientProposal.CommandId)
-				r.ReplyProposeTS(&genericsmrproto.ProposeReplyTS{TRUE, inst.lb.clientProposal.CommandId, state.NIL, inst.lb.clientProposal.Timestamp},
+				r.ReplyProposeTS(&genericsmrproto.ProposeReplyTS{TRUE, inst.lb.clientProposal.CommandId, inst.lb.clientProposal.Command.Execute(r.State), inst.lb.clientProposal.Timestamp},
 					inst.lb.clientProposal.Reply)
 			}
 			inst.status = EXECUTED
@@ -982,7 +971,7 @@ func (r *Replica) forceCommit() {
 		if r.instanceSpace[problemInstance] == nil {
 			r.instanceSpace[problemInstance] = &Instance{true,
 				NB_INST_TO_SKIP,
-				&state.Command{state.NONE, 0, 0, upadteWeightRandom()},
+				&state.Command{state.NONE, 0, state.NIL},
 				r.makeUniqueBallot(1),
 				PREPARING,
 				&LeaderBookkeeping{nil, 0, 0, 0, 0}}

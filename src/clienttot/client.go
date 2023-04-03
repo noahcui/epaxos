@@ -2,7 +2,7 @@ package main
 
 import (
 	"log"
-	//	"github.com/noahcui/epaxos/dlog"
+	//	"github.com/noahcui/epaxos/src/dlog"
 	"bufio"
 	"flag"
 	"fmt"
@@ -13,9 +13,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/noahcui/epaxos/genericsmrproto"
-	"github.com/noahcui/epaxos/masterproto"
-	"github.com/noahcui/epaxos/state"
+	"github.com/noahcui/epaxos/src/genericsmrproto"
+	"github.com/noahcui/epaxos/src/masterproto"
+	"github.com/noahcui/epaxos/src/state"
 )
 
 var masterAddr *string = flag.String("maddr", "", "Master address. Defaults to localhost")

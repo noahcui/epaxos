@@ -1,8 +1,9 @@
 package bloomfilter
 
 import (
-	"bitvec"
 	"math"
+
+	"github.com/noahcui/epaxos/src/bitvec"
 )
 
 const (

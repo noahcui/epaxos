@@ -13,12 +13,12 @@ import (
 	"runtime/pprof"
 	"time"
 
-	"github.com/noahcui/epaxos/epaxos"
-	"github.com/noahcui/epaxos/gpaxos"
-	"github.com/noahcui/epaxos/masterproto"
-	"github.com/noahcui/epaxos/mencius"
-	"github.com/noahcui/epaxos/menciusopt"
-	"github.com/noahcui/epaxos/paxos"
+	"github.com/noahcui/epaxos/src/epaxos"
+	"github.com/noahcui/epaxos/src/gpaxos"
+	"github.com/noahcui/epaxos/src/masterproto"
+	"github.com/noahcui/epaxos/src/mencius"
+	"github.com/noahcui/epaxos/src/menciusopt"
+	"github.com/noahcui/epaxos/src/paxos"
 )
 
 var portnum *int = flag.Int("port", 7070, "Port # to listen on. Defaults to 7070")
@@ -67,7 +67,7 @@ func main() {
 		rep := mencius.NewReplica(replicaId, nodeList, *thrifty, *exec, *dreply, *durable)
 		rpc.Register(rep)
 	} else if *doMenciusOpt {
-		log.Println("Starting Mencius replica...")
+		log.Println("Starting MenciusOpt replica...")
 		rep := menciusopt.NewReplica(replicaId, nodeList, *thrifty, *exec, *dreply, *durable)
 		rpc.Register(rep)
 	} else if *doGpaxos {

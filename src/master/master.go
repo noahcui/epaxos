@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -10,24 +11,55 @@ import (
 	"sync"
 	"time"
 
-	"github.com/noahcui/epaxos/genericsmrproto"
-	"github.com/noahcui/epaxos/masterproto"
+	"github.com/noahcui/epaxos/src/genericsmrproto"
+	"github.com/noahcui/epaxos/src/masterproto"
 )
 
 var portnum *int = flag.Int("port", 7087, "Port # to listen on. Defaults to 7087")
 var numNodes *int = flag.Int("N", 3, "Number of replicas. Defaults to 3.")
 
 type Master struct {
-	N        int
-	nodeList []string
-	addrList []string
-	portList []int
-	lock     *sync.Mutex
-	nodes    []*rpc.Client
-	leader   []bool
-	alive    []bool
+	N            int
+	nodeList     []string
+	addrList     []string
+	portList     []int
+	lock         *sync.Mutex
+	nodes        []*rpc.Client
+	leader       []bool
+	alive        []bool
+	idxForServer int64
 }
 
+func (master *Master) listenHttp() {
+
+	http.HandleFunc("/replicaList", func(w http.ResponseWriter, r *http.Request) {
+
+		if r.Method != http.MethodPost {
+			fmt.Println("Method not allowed")
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var args masterproto.GetReplicaListArgs
+		if err := json.NewDecoder(r.Body).Decode(&args); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		reply := master.GetReplicaListJava(args)
+
+		if err := json.NewEncoder(w).Encode(reply); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	})
+
+	addr := ":8080"
+	fmt.Printf("Listening on %s...\n", addr)
+	if err := http.ListenAndServe(addr, nil); err != nil {
+		fmt.Println(err)
+	}
+}
 func main() {
 	flag.Parse()
 
@@ -41,7 +73,8 @@ func main() {
 		new(sync.Mutex),
 		make([]*rpc.Client, *numNodes),
 		make([]bool, *numNodes),
-		make([]bool, *numNodes)}
+		make([]bool, *numNodes),
+		0}
 
 	rpc.Register(master)
 	rpc.HandleHTTP()
@@ -51,7 +84,7 @@ func main() {
 	}
 
 	go master.run()
-
+	go master.listenHttp()
 	http.Serve(l, nil)
 }
 
@@ -172,4 +205,19 @@ func (master *Master) GetReplicaList(args *masterproto.GetReplicaListArgs, reply
 		reply.Ready = false
 	}
 	return nil
+}
+
+func (master *Master) GetReplicaListJava(args masterproto.GetReplicaListArgs) masterproto.GetReplicaListReply {
+	master.lock.Lock()
+	defer master.lock.Unlock()
+	reply := masterproto.GetReplicaListReply{}
+	if len(master.nodeList) == master.N {
+		reply.ReplicaList = master.nodeList
+		reply.Ready = true
+		reply.Leader = master.idxForServer % int64(master.N)
+		master.idxForServer += 1
+	} else {
+		reply.Ready = false
+	}
+	return reply
 }

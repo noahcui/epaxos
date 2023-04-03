@@ -1,12 +1,12 @@
 package epaxos
 
 import (
-	//    "github.com/noahcui/epaxos/state"
+	//    "github.com/noahcui/epaxos/src/state"
 	"sort"
 	"time"
 
-	"github.com/noahcui/epaxos/epaxosproto"
-	"github.com/noahcui/epaxos/genericsmrproto"
+	"github.com/noahcui/epaxos/src/epaxosproto"
+	"github.com/noahcui/epaxos/src/genericsmrproto"
 )
 
 const (

@@ -1,7 +1,7 @@
 package genericsmrproto
 
 import (
-	"github.com/noahcui/epaxos/state"
+	"github.com/noahcui/epaxos/src/state"
 )
 
 const (
@@ -14,13 +14,11 @@ const (
 	GENERIC_SMR_BEACON
 	GENERIC_SMR_BEACON_REPLY
 )
-const WEIGHTSIZE = 1024
 
 type Propose struct {
 	CommandId int32
 	Command   state.Command
 	Timestamp int64
-	// Weight    [WEIGHTSIZE]byte
 }
 
 type ProposeReply struct {

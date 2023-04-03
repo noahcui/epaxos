@@ -10,10 +10,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/noahcui/epaxos/fastrpc"
-	"github.com/noahcui/epaxos/genericsmrproto"
-	"github.com/noahcui/epaxos/rdtsc"
-	"github.com/noahcui/epaxos/state"
+	"github.com/noahcui/epaxos/src/fastrpc"
+	"github.com/noahcui/epaxos/src/genericsmrproto"
+	"github.com/noahcui/epaxos/src/rdtsc"
+	"github.com/noahcui/epaxos/src/state"
 )
 
 const CHAN_BUFFER_SIZE = 200000
