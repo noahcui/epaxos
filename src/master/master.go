@@ -21,7 +21,9 @@ var numNodes *int = flag.Int("N", 3, "Number of replicas. Defaults to 3.")
 type Master struct {
 	N            int
 	nodeList     []string
+	pubNodeList  []string
 	addrList     []string
+	pubAddrList  []string
 	portList     []int
 	lock         *sync.Mutex
 	nodes        []*rpc.Client
@@ -67,6 +69,8 @@ func main() {
 	log.Printf("...waiting for %d replicas\n", *numNodes)
 
 	master := &Master{*numNodes,
+		make([]string, 0, *numNodes),
+		make([]string, 0, *numNodes),
 		make([]string, 0, *numNodes),
 		make([]string, 0, *numNodes),
 		make([]int, 0, *numNodes),
@@ -154,6 +158,7 @@ func (master *Master) Register(args *masterproto.RegisterArgs, reply *masterprot
 	index := nlen
 
 	addrPort := fmt.Sprintf("%s:%d", args.Addr, args.Port)
+	pubAddrPort := fmt.Sprintf("%s:%d", args.PubAddr, args.Port)
 
 	for i, ap := range master.nodeList {
 		if addrPort == ap {
@@ -165,8 +170,12 @@ func (master *Master) Register(args *masterproto.RegisterArgs, reply *masterprot
 	if index == nlen {
 		master.nodeList = master.nodeList[0 : nlen+1]
 		master.nodeList[nlen] = addrPort
+		master.pubNodeList = master.pubNodeList[0 : nlen+1]
+		master.pubNodeList[nlen] = pubAddrPort
 		master.addrList = master.addrList[0 : nlen+1]
 		master.addrList[nlen] = args.Addr
+		master.pubAddrList = master.pubAddrList[0 : nlen+1]
+		master.pubAddrList[nlen] = args.PubAddr
 		master.portList = master.portList[0 : nlen+1]
 		master.portList[nlen] = args.Port
 		nlen++
@@ -198,8 +207,8 @@ func (master *Master) GetReplicaList(args *masterproto.GetReplicaListArgs, reply
 	master.lock.Lock()
 	defer master.lock.Unlock()
 
-	if len(master.nodeList) == master.N {
-		reply.ReplicaList = master.nodeList
+	if len(master.pubNodeList) == master.N {
+		reply.ReplicaList = master.pubNodeList
 		reply.Ready = true
 	} else {
 		reply.Ready = false
@@ -211,8 +220,8 @@ func (master *Master) GetReplicaListJava(args masterproto.GetReplicaListArgs) ma
 	master.lock.Lock()
 	defer master.lock.Unlock()
 	reply := masterproto.GetReplicaListReply{}
-	if len(master.nodeList) == master.N {
-		reply.ReplicaList = master.nodeList
+	if len(master.pubNodeList) == master.N {
+		reply.ReplicaList = master.pubNodeList
 		reply.Ready = true
 		reply.Leader = master.idxForServer % int64(master.N)
 		master.idxForServer += 1

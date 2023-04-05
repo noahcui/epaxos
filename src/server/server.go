@@ -25,6 +25,7 @@ var portnum *int = flag.Int("port", 7070, "Port # to listen on. Defaults to 7070
 var masterAddr *string = flag.String("maddr", "", "Master address. Defaults to localhost.")
 var masterPort *int = flag.Int("mport", 7087, "Master port.  Defaults to 7087.")
 var myAddr *string = flag.String("addr", "", "Server address (this machine). Defaults to localhost.")
+var pubAddr *string = flag.String("pubaddr", "", "Server public address (this machine). Defaults to localhost.")
 var doMencius *bool = flag.Bool("m", false, "Use Mencius as the replication protocol. Defaults to false.")
 var doMenciusOpt *bool = flag.Bool("mo", false, "Use MenciusOpt as the replication protocol. Defaults to false.")
 var doGpaxos *bool = flag.Bool("g", false, "Use Generalized Paxos as the replication protocol. Defaults to false.")
@@ -57,6 +58,10 @@ func main() {
 	log.Printf("Server starting on port %d\n", *portnum)
 
 	replicaId, nodeList := registerWithMaster(fmt.Sprintf("%s:%d", *masterAddr, *masterPort))
+
+	if *pubAddr == "" {
+		*pubAddr = *myAddr
+	}
 
 	if *doEpaxos {
 		log.Println("Starting Egalitarian Paxos replica...")
@@ -91,7 +96,7 @@ func main() {
 }
 
 func registerWithMaster(masterAddr string) (int, []string) {
-	args := &masterproto.RegisterArgs{*myAddr, *portnum}
+	args := &masterproto.RegisterArgs{*myAddr, *pubAddr, *portnum}
 	var reply masterproto.RegisterReply
 
 	for done := false; !done; {
