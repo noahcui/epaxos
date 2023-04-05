@@ -1011,6 +1011,7 @@ func (r *Replica) forceCommit() {
 		} else {
 
 			log.Println("Not nil")
+			r.instanceSpace[problemInstance].ballot = r.makeBallotLargerThan(r.instanceSpace[problemInstance].ballot)
 			r.bcastPrepare(problemInstance, r.instanceSpace[problemInstance].ballot)
 		}
 	}
