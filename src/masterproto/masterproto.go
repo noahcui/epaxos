@@ -1,9 +1,8 @@
 package masterproto
 
 type RegisterArgs struct {
-	Addr    string
-	PubAddr string
-	Port    int
+	Addr string
+	Port int
 }
 
 type RegisterReply struct {
