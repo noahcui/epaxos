@@ -857,7 +857,7 @@ func (r *Replica) updateBlocking(instance int32) {
 					for i := 0; i < len(inst.lb.clientProposals); i++ {
 						dlog.Printf("Sending ACK for req. %d\n", inst.lb.clientProposals[i].CommandId)
 						// fmt.Println("hey, I amhere")
-						r.ReplyProposeTS(&genericsmrproto.ProposeReplyTS{TRUE, inst.lb.clientProposals[i].CommandId, inst.lb.clientProposals[i].Command.Execute(r.State), inst.lb.clientProposals[i].Timestamp},
+						r.ReplyProposeTS(&genericsmrproto.ProposeReplyTS{TRUE, inst.lb.clientProposals[i].CommandId, state.NIL, inst.lb.clientProposals[i].Timestamp},
 							inst.lb.clientProposals[i].Reply)
 						// fmt.Println("replied", i, instance)
 					}
@@ -954,10 +954,10 @@ func (r *Replica) executeCommands() {
 				break
 			}
 			for idx := 0; idx < len(inst.commands); idx++ {
-				inst.commands[idx].Execute(r.State)
+				val := inst.commands[idx].Execute(r.State)
 				if r.Dreply && inst.lb != nil && len(inst.lb.clientProposals) > 0 && inst.lb.clientProposals[idx] != nil {
 					dlog.Printf("Sending ACK for req. %d\n", inst.lb.clientProposals[idx].CommandId)
-					r.ReplyProposeTS(&genericsmrproto.ProposeReplyTS{TRUE, inst.lb.clientProposals[idx].CommandId, inst.commands[idx].Execute(r.State), inst.lb.clientProposals[idx].Timestamp},
+					r.ReplyProposeTS(&genericsmrproto.ProposeReplyTS{TRUE, inst.lb.clientProposals[idx].CommandId, val, inst.lb.clientProposals[idx].Timestamp},
 						inst.lb.clientProposals[idx].Reply)
 				}
 			}
@@ -1011,7 +1011,7 @@ func (r *Replica) forceCommit() {
 		} else {
 
 			log.Println("Not nil")
-			r.instanceSpace[problemInstance].ballot = r.makeBallotLargerThan(r.instanceSpace[problemInstance].ballot)
+			// r.instanceSpace[problemInstance].ballot = r.makeBallotLargerThan(r.instanceSpace[problemInstance].ballot)
 			r.bcastPrepare(problemInstance, r.instanceSpace[problemInstance].ballot)
 		}
 	}
