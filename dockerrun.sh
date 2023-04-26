@@ -27,3 +27,4 @@ docker update --memory 2g --memory-swap 4g sb
 
 # echo sb
 # docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' sb
+# --network=host

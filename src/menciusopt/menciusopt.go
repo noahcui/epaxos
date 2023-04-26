@@ -21,6 +21,7 @@ const NB_INST_TO_SKIP = -1000
 const MAX_SKIPS_WAITING = 20
 const TRUE = uint8(1)
 const FALSE = uint8(0)
+const BATCHTIME = 3
 
 type Replica struct {
 	*genericsmr.Replica      // extends a generic Paxos replica
@@ -213,7 +214,7 @@ func (r *Replica) run() {
 		fmt.Println("makesure changes applied, hello")
 		go r.executeCommands()
 	}
-	bTicker := time.NewTicker(time.Millisecond * 3)
+	bTicker := time.NewTicker(time.Millisecond * BATCHTIME)
 	go r.clock()
 
 	for !r.Shutdown {
@@ -300,6 +301,9 @@ func (r *Replica) run() {
 				dlog.Printf("Doing force commit\n")
 				r.forceCommit()
 			}
+			break
+		case <-r.OnClientConnect:
+			// do not block here.
 			break
 		}
 	}
@@ -1011,7 +1015,7 @@ func (r *Replica) forceCommit() {
 		} else {
 
 			log.Println("Not nil")
-			// r.instanceSpace[problemInstance].ballot = r.makeBallotLargerThan(r.instanceSpace[problemInstance].ballot)
+			r.instanceSpace[problemInstance].ballot = r.makeBallotLargerThan(r.instanceSpace[problemInstance].ballot)
 			r.bcastPrepare(problemInstance, r.instanceSpace[problemInstance].ballot)
 		}
 	}

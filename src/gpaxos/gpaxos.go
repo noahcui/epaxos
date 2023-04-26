@@ -349,6 +349,10 @@ func (r *Replica) run() {
 				r.commandsMutex.Unlock()
 				break
 
+			case <-r.OnClientConnect:
+				// do not block here.
+				break
+
 			case <-clockChan:
 				//way out of deadlock
 
@@ -370,6 +374,10 @@ func (r *Replica) run() {
 		} else {
 
 			select {
+
+			case <-r.OnClientConnect:
+				// do not block here.
+				break
 
 			case prepare := <-r.prepareChan:
 				//got a Prepare message

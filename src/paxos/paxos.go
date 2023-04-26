@@ -156,7 +156,7 @@ var clockChan chan bool
 
 func (r *Replica) clock() {
 	for !r.Shutdown {
-		time.Sleep(1000 * 1000 * 5)
+		time.Sleep(1000 * 1000 * 3)
 		clockChan <- true
 	}
 }
@@ -241,6 +241,9 @@ func (r *Replica) run() {
 			//got an Accept reply
 			dlog.Printf("Received AcceptReply for instance %d\n", acceptReply.Instance)
 			r.handleAcceptReply(acceptReply)
+			break
+		case <-r.OnClientConnect:
+			// do not block here.
 			break
 		}
 	}

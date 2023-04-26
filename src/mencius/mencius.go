@@ -17,7 +17,7 @@ import (
 
 const CHAN_BUFFER_SIZE = 200000
 const WAIT_BEFORE_SKIP_MS = 5
-const NB_INST_TO_SKIP = -100
+const NB_INST_TO_SKIP = -1000
 const MAX_SKIPS_WAITING = 2
 const TRUE = uint8(1)
 const FALSE = uint8(0)
@@ -260,6 +260,9 @@ func (r *Replica) run() {
 				dlog.Printf("Doing force commit\n")
 				r.forceCommit()
 			}
+			break
+		case <-r.OnClientConnect:
+			// do not block here.
 			break
 		}
 	}
